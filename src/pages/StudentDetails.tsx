@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ensureTasksHaveCreatedAt, Task } from '@/lib/api';
+import { toast } from 'react-toastify';
 
 interface StudentData {
   id: string;
@@ -45,6 +45,7 @@ const StudentDetails = () => {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   useEffect(() => {
     if (studentId) {
@@ -68,93 +69,75 @@ const StudentDetails = () => {
   };
 
   const fetchTasks = async () => {
-    // Check if studentId exists and is valid
-    if (!studentId) {
-      console.error('No student ID provided');
-      return;
-    }
-
+    if (!studentId) return;
+    
     try {
-      // Use the specific table name available in the database
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('student_tasks') // Using student_tasks table instead of tasks
+      setTasksLoading(true);
+      
+      const { data, error } = await supabase
+        .from('tasks')
         .select('*')
-        .eq('student_id', parseInt(studentId));
-
-      if (tasksError) {
-        console.error('Error fetching tasks:', tasksError);
-        setTasks([]);
-      } else if (tasksData) {
-        setTasks(tasksData as TaskData[]);
-      } else {
-        setTasks([]);
-      }
+        .eq('student_id', studentId);
+        
+      if (error) throw error;
+      
+      setTasks(data || []);
     } catch (error) {
-      console.error('Exception in fetchTasks:', error);
-      setTasks([]);
+      console.error('Error fetching tasks:', error);
+      toast.error('Failed to load student tasks');
+    } finally {
+      setTasksLoading(false);
     }
   };
 
-  const handleAddTask = async () => {
-    if (!newTaskDescription || !newTaskDueDate) {
-      alert('Please enter a description and due date for the task.');
-      return;
-    }
-
-    setIsAddingTask(true);
-
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentId || !newTaskDescription || !newTaskDueDate) return;
+    
     try {
-      // Use the specific table available in the database
+      setTasksLoading(true);
+      
       const { error } = await supabase
-        .from('student_tasks') // Using student_tasks table instead of tasks
+        .from('tasks')
         .insert({
-          student_id: parseInt(studentId!),
+          student_id: studentId,
           description: newTaskDescription,
           due_date: newTaskDueDate.toISOString(),
-          completed: false,
-          created_at: new Date().toISOString()
+          completed: false
         });
-
-      if (error) {
-        console.error('Error adding task:', error);
-        alert('Failed to add task.');
-      } else {
-        // Refresh tasks after adding
-        await fetchTasks();
-        setNewTaskDescription('');
-        setNewTaskDueDate(undefined);
-        alert('Task added successfully!');
-      }
+        
+      if (error) throw error;
+      
+      setNewTaskDescription('');
+      setNewTaskDueDate(undefined);
+      fetchTasks();
+      toast.success('Task added successfully');
     } catch (error) {
-      console.error('Exception in handleAddTask:', error);
-      alert('An unexpected error occurred.');
+      console.error('Error adding task:', error);
+      toast.error('Failed to add task');
     } finally {
-      setIsAddingTask(false);
+      setTasksLoading(false);
     }
   };
 
-  const handleTaskCompletion = async (taskId: number, completed: boolean) => {
+  const toggleTaskCompletion = async (taskId: number, completed: boolean) => {
     try {
-      // Use the specific table available in the database
+      setTasksLoading(true);
+      
       const { error } = await supabase
-        .from('student_tasks') // Using student_tasks table instead of tasks
+        .from('tasks')
         .update({ completed: !completed })
         .eq('id', taskId);
-
-      if (error) {
-        console.error('Error updating task:', error);
-        alert('Failed to update task.');
-      } else {
-        // Update the local state
-        setTasks(
-          tasks.map((task) =>
-            task.id === taskId ? { ...task, completed: !completed } : task
-          )
-        );
-      }
+        
+      if (error) throw error;
+      
+      fetchTasks();
+      toast.success(completed ? 'Task marked as incomplete' : 'Task marked as complete');
     } catch (error) {
-      console.error('Exception in handleTaskCompletion:', error);
-      alert('An unexpected error occurred.');
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task');
+    } finally {
+      setTasksLoading(false);
     }
   };
 
@@ -187,7 +170,7 @@ const StudentDetails = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleTaskCompletion(task.id, task.completed)}
+                    onClick={() => toggleTaskCompletion(task.id, task.completed)}
                   >
                     {task.completed ? 'Mark Incomplete' : 'Mark Complete'}
                   </Button>
