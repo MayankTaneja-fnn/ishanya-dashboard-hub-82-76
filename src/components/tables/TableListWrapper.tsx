@@ -24,9 +24,9 @@ const TableListWrapper = ({ program, onSelectTable, selectedTable }: TableListWr
         setLoading(true);
         
         // Only include students and employees tables
-        const filteredTables = [
+        const filteredTables: TableInfo[] = [
           { 
-            id: 1, 
+            id: '1', 
             name: 'students', 
             program_id: program.program_id, 
             description: 'Student information',
@@ -34,7 +34,7 @@ const TableListWrapper = ({ program, onSelectTable, selectedTable }: TableListWr
             center_id: program.center_id
           },
           { 
-            id: 3, 
+            id: '3', 
             name: 'employees', 
             program_id: program.program_id, 
             description: 'Employee information',

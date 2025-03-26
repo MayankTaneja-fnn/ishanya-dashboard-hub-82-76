@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Megaphone } from 'lucide-react';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
-import supabase from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import AnnouncementForm from '@/components/admin/AnnouncementForm';
 

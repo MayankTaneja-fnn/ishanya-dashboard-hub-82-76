@@ -1,206 +1,136 @@
 
 import { useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FileUpload, X } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentUser } from '@/lib/auth';
+import { toast } from 'sonner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-interface ReportUploaderProps {
+export type ReportUploaderProps = {
+  studentId: string | number;
   onSuccess: () => void;
-  onCancel: () => void;
-  studentId?: number; // Allow for specific student ID to be passed
-}
+  onClose?: () => void; // Making onClose optional
+};
 
-const ReportUploader = ({ onSuccess, onCancel, studentId }: ReportUploaderProps) => {
+const ReportUploader = ({ studentId, onSuccess, onClose }: ReportUploaderProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
-    setError(null);
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
   };
-  
+
   const handleUpload = async () => {
     if (!selectedFile) {
-      setError("Please select a file to upload");
+      toast.error('Please select a file to upload');
       return;
     }
-    
-    const user = getCurrentUser();
-    if (!user) {
-      setError("You must be logged in to upload reports");
-      return;
-    }
-    
+
+    setUploading(true);
+
     try {
-      setUploading(true);
-      setUploadProgress(10);
+      // Generate a unique prefix for the file using timestamp
+      const filePrefix = `${Date.now()}-${selectedFile.name}`;
       
-      // If studentId is provided, use it directly; otherwise, get parent's student_id
-      let targetStudentId = studentId;
-      
-      if (!targetStudentId) {
-        // Get parent's student_id
-        const { data: parentData, error: parentError } = await supabase
-          .from('parents')
-          .select('student_id')
-          .eq('email', user.email)
-          .single();
-          
-        if (parentError || !parentData || !parentData.student_id) {
-          throw new Error("Could not determine student ID");
-        }
-        
-        targetStudentId = parentData.student_id;
-      }
-      
-      setUploadProgress(30);
-      
-      // Prepare file path and ensure unique filename
-      const timestamp = new Date().getTime();
-      const fileExtension = selectedFile.name.split('.').pop();
-      const fileName = `${timestamp}-${selectedFile.name}`;
-      const filePath = `student-reports/${targetStudentId}/${fileName}`;
-      
-      setUploadProgress(50);
-      
-      // Upload file to Supabase Storage
-      const { error: uploadError } = await supabase
-        .storage
+      const { error } = await supabase.storage
         .from('ishanya')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-        
-      if (uploadError) {
-        throw new Error(uploadError.message);
+        .upload(`student-reports/${studentId}/${filePrefix}`, selectedFile);
+
+      if (error) {
+        throw error;
       }
-      
-      setUploadProgress(100);
-      setSuccess(true);
-      
-      // Give a moment for the user to see the success state
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
-      
-    } catch (err) {
-      console.error('Error uploading report:', err);
-      setError(err instanceof Error ? err.message : "Failed to upload report");
+
+      toast.success('Report uploaded successfully');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      onSuccess();
+      if (onClose) onClose();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(`Upload failed: ${error.message}`);
+    } finally {
       setUploading(false);
     }
   };
-  
-  const handleCancel = () => {
-    if (uploading) return;
-    onCancel();
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  
+
   return (
-    <div className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      {success ? (
-        <div className="text-center py-8">
-          <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-          <h3 className="font-semibold text-lg">Upload Complete!</h3>
-          <p className="text-gray-500">Your report has been uploaded successfully.</p>
-        </div>
-      ) : (
-        <>
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
-            {selectedFile ? (
-              <div className="space-y-2">
-                <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle className="text-center">Upload Student Report</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="report">Select PDF Report</Label>
+            <div className="flex items-center gap-2">
+              <Input 
+                id="report" 
+                type="file" 
+                accept=".pdf"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="flex-1"
+              />
+              {selectedFile && (
                 <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    setSelectedFile(null);
-                    if (inputRef.current) {
-                      inputRef.current.value = '';
-                    }
-                  }}
-                  className="mt-2"
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={clearSelection}
+                  title="Clear selection"
                 >
-                  Choose Different File
+                  <X className="h-4 w-4" />
                 </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Upload className="h-12 w-12 text-gray-300 mx-auto" />
-                <div>
-                  <p className="font-medium">Drag and drop your file here</p>
-                  <p className="text-sm text-gray-500">
-                    or click to browse your files
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => inputRef.current?.click()}
-                >
-                  Select File
-                </Button>
-              </div>
-            )}
-            
-            <Input
-              ref={inputRef}
-              type="file"
-              className="hidden"
-              onChange={handleFileChange}
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            />
+              )}
+            </div>
           </div>
           
-          {uploading && (
-            <div className="space-y-2">
-              <Progress value={uploadProgress} />
-              <p className="text-sm text-gray-500 text-center">
-                Uploading... {uploadProgress}%
-              </p>
+          {selectedFile && (
+            <div className="text-sm bg-muted p-2 rounded">
+              <p><strong>Selected file:</strong> {selectedFile.name}</p>
+              <p><strong>Size:</strong> {(selectedFile.size / 1024).toFixed(2)} KB</p>
             </div>
           )}
-          
-          <div className="flex justify-end gap-3 mt-4">
-            <Button 
-              variant="outline" 
-              onClick={handleCancel}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUpload}
-              disabled={!selectedFile || uploading}
-              className="flex items-center gap-2"
-            >
-              <Upload className="h-4 w-4" />
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={onClose}
+          disabled={uploading}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleUpload}
+          disabled={!selectedFile || uploading}
+          className="bg-ishanya-green hover:bg-ishanya-green/90"
+        >
+          {uploading ? (
+            <>
+              <LoadingSpinner size="sm" className="mr-2" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <FileUpload className="mr-2 h-4 w-4" />
               Upload Report
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

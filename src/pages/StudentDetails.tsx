@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { ensureTasksHaveCreatedAt, Task } from '@/lib/api';
 
 interface StudentData {
@@ -66,10 +66,11 @@ const StudentDetails = () => {
     }
 
     try {
-      // Use a custom query to get tasks related to this student
-      // This is a workaround if student_tasks isn't in the database schema
+      // Use a direct query instead of RPC
       const { data: tasksData, error: tasksError } = await supabase
-        .rpc('get_student_tasks', { student_id_param: parseInt(studentId) });
+        .from('tasks')
+        .select('*')
+        .eq('student_id', parseInt(studentId));
 
       if (tasksError) {
         console.error('Error fetching tasks:', tasksError);
@@ -94,13 +95,15 @@ const StudentDetails = () => {
     setIsAddingTask(true);
 
     try {
-      // Use a custom RPC function to add a task for this student
-      const { data, error } = await supabase
-        .rpc('add_student_task', {
-          student_id_param: parseInt(studentId!),
-          description_param: newTaskDescription,
-          due_date_param: newTaskDueDate.toISOString(),
-          completed_param: false
+      // Use a direct insert instead of RPC
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          student_id: parseInt(studentId!),
+          description: newTaskDescription,
+          due_date: newTaskDueDate.toISOString(),
+          completed: false,
+          created_at: new Date().toISOString()
         });
 
       if (error) {
@@ -123,12 +126,11 @@ const StudentDetails = () => {
 
   const handleTaskCompletion = async (taskId: number, completed: boolean) => {
     try {
-      // Use a custom RPC function to update task completion status
+      // Use a direct update instead of RPC
       const { error } = await supabase
-        .rpc('update_task_completion', {
-          task_id_param: taskId,
-          completed_param: !completed
-        });
+        .from('tasks')
+        .update({ completed: !completed })
+        .eq('id', taskId);
 
       if (error) {
         console.error('Error updating task:', error);

@@ -47,6 +47,13 @@ export interface Task {
   created_at: string;
 }
 
+// API response type
+export interface ApiResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+}
+
 // API functions
 import { supabase } from '@/integrations/supabase/client';
 
@@ -128,20 +135,51 @@ export const fetchTableColumns = async (tableName: string): Promise<string[]> =>
   return tableColumns[tableName.toLowerCase()] || [];
 };
 
-export const bulkInsert = async (tableName: string, data: any[]): Promise<boolean> => {
+export const bulkInsert = async (tableName: string, data: any[]): Promise<ApiResponse> => {
   try {
+    // Using fixed table names since dynamic table names aren't supported in the type system
+    const allowedTables = ['students', 'educators', 'employees', 'centers', 'programs', 'courses'];
+    
+    if (!allowedTables.includes(tableName)) {
+      return { 
+        success: false, 
+        message: `Invalid table name: ${tableName}. Allowed tables are: ${allowedTables.join(', ')}` 
+      };
+    }
+    
     const { error } = await supabase
-      .from(tableName)
+      .from(tableName as any)
       .insert(data);
       
     if (error) {
       console.error(`Error bulk inserting into ${tableName}:`, error);
-      return false;
+      return { 
+        success: false, 
+        message: `Error inserting data: ${error.message}` 
+      };
     }
     
-    return true;
-  } catch (error) {
+    return { 
+      success: true, 
+      message: `Successfully inserted ${data.length} records into ${tableName}` 
+    };
+  } catch (error: any) {
     console.error(`Exception in bulkInsert for ${tableName}:`, error);
-    return false;
+    return { 
+      success: false, 
+      message: `Unexpected error: ${error.message}` 
+    };
   }
 };
+
+// Export as default to fix module import issues
+const api = {
+  ensureTasksHaveCreatedAt,
+  fetchCenters,
+  fetchProgramsByCenter,
+  fetchTablesByProgram,
+  fetchTableColumns,
+  bulkInsert
+};
+
+export default api;

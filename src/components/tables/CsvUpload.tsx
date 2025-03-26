@@ -11,7 +11,7 @@ export type CsvUploadProps = {
   tableName: string;
   onSuccess: () => void;
   onClose?: () => void;
-  onCancel?: () => void; // Added this prop to fix the type error
+  onCancel?: () => void;
 };
 
 const CsvUpload = ({ tableName, onSuccess, onClose, onCancel }: CsvUploadProps) => {
@@ -85,7 +85,6 @@ const CsvUpload = ({ tableName, onSuccess, onClose, onCancel }: CsvUploadProps) 
               toast.success(result.message);
               onSuccess();
               if (onClose) onClose();
-              if (onCancel) onCancel(); // Handle the onCancel prop
             } else {
               setError(result.message);
             }
