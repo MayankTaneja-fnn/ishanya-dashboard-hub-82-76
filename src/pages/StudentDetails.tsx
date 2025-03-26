@@ -1,476 +1,212 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import axios from 'axios';
-import { convertTaskDataTypes } from '@/utils/typeConverters';
+import { Layout } from '@/components/layout/Layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { ensureTasksHaveCreatedAt } from '@/lib/api';
 
-type Student = {
+interface Task {
+  id: number;
   student_id: number;
-  first_name: string;
-  last_name: string;
-  gender: string;
-  program_id: number;
-  educator_employee_id: number;
-  center_id: number;
-};
-
-type PerformanceRecord = {
-  student_id: number;
-  program_id: number;
-  educator_employee_id: number;
-  quarter: string;
-  area_of_development: string;
-  [key: string]: any;
-};
-
-type GeneralReport = {
-  student_id: number;
-  program_id: number;
-  educator_employee_id: number;
-  quarter: string;
-  punctuality?: string;
-  preparedness?: string;
-  assistance_required?: string;
-  parental_support?: string;
-  any_behavioral_issues?: string;
-};
-
-type Task = {
-  task_id: string;
-  title: string;
   description: string;
-  status: string;
   due_date: string;
+  completed: boolean;
   created_at: string;
-  priority: string;
-  category: string;
-  feedback?: string;
-};
-
-type Attendance = {
-  present: number;
-  absent: number;
-};
-
-const QUARTERS = [
-  "January 2025 - March 2025",
-  "April 2025 - June 2025",
-  "July 2025 - September 2025",
-  "October 2025 - December 2025"
-];
-
-const YEARS = [2024, 2025, 2026];
+}
 
 const StudentDetails = () => {
   const { studentId } = useParams<{ studentId: string }>();
-  const [student, setStudent] = useState<Student | null>(null);
-  const [performanceRecords, setPerformanceRecords] = useState<PerformanceRecord[]>([]);
-  const [generalReports, setGeneralReports] = useState<GeneralReport[]>([]);
+  const [student, setStudent] = useState<any>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [attendance, setAttendance] = useState<Attendance>({ present: 0, absent: 0 });
-  const [expandedQuarter, setExpandedQuarter] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentYear, setCurrentYear] = useState<number>(2025);
-  const [loadingReport, setLoadingReport] = useState(false);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   useEffect(() => {
-    const fetchStudentData = async () => {
-      if (!studentId) return;
-      
-      setLoading(true);
-      try {
-        const studentIdNum = parseInt(studentId, 10);
-        
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('student_id, first_name, last_name, gender, program_id, educator_employee_id, center_id')
-          .eq('student_id', studentIdNum)
-          .single();
-
-        if (studentError) throw studentError;
-        setStudent(studentData);
-
-        const { data: perfData, error: perfError } = await supabase
-          .from('performance_records')
-          .select('*')
-          .eq('student_id', studentIdNum);
-
-        if (perfError) throw perfError;
-        setPerformanceRecords(perfData || []);
-
-        const { data: reportData, error: reportError } = await supabase
-          .from('general_reporting')
-          .select('*')
-          .eq('student_id', studentIdNum);
-
-        if (reportError) throw reportError;
-        setGeneralReports(reportData || []);
-
-        const { data: taskData, error: taskError } = await supabase
-          .from('goals_tasks')
-          .select('*')
-          .eq('student_id', studentIdNum);
-
-        if (taskError) throw taskError;
-        setTasks(taskData || []);
-
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from('student_attendance')
-          .select('attendance')
-          .eq('student_id', studentIdNum);
-
-        if (attendanceError) throw attendanceError;
-        
-        const present = attendanceData?.filter(a => a.attendance === true).length || 0;
-        const absent = attendanceData?.filter(a => a.attendance === false).length || 0;
-        setAttendance({ present, absent });
-
-      } catch (error) {
-        console.error('Error fetching student data:', error);
-        toast.error('Failed to load student data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStudentData();
+    if (studentId) {
+      fetchStudent();
+      fetchTasks();
+    }
   }, [studentId]);
+
+  const fetchStudent = async () => {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', studentId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching student:', error);
+    } else {
+      setStudent(data);
+    }
+  };
 
   const fetchTasks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('student_id', studentId);
-        
-      if (error) {
-        console.error('Error fetching tasks:', error);
-        return;
-      }
-      
-      if (data) {
-        const convertedTasks = data.map(task => convertTaskDataTypes(task));
-        setTasks(convertedTasks);
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    }
-  };
+    const { data: tasksData, error: tasksError } = await supabase
+      .from('student_tasks')  // Use the correct table name here
+      .select('*')
+      .eq('student_id', studentId);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [studentId]);
-
-  const getQuarterlyPerformance = (quarter: string) => {
-    if (!student) return null;
-    
-    const yearPrefix = currentYear.toString();
-    const fullQuarter = quarter.includes(yearPrefix) ? quarter : quarter.replace(/\d{4}/g, yearPrefix);
-    
-    return performanceRecords.find(record => 
-      record.student_id === student.student_id &&
-      record.program_id === student.program_id &&
-      record.educator_employee_id === student.educator_employee_id &&
-      record.quarter === fullQuarter
-    );
-  };
-
-  const getQuarterlyReport = (quarter: string) => {
-    if (!student) return null;
-    
-    const yearPrefix = currentYear.toString();
-    const fullQuarter = quarter.includes(yearPrefix) ? quarter : quarter.replace(/\d{4}/g, yearPrefix);
-    
-    return generalReports.find(report => 
-      report.student_id === student.student_id &&
-      report.program_id === student.program_id &&
-      report.educator_employee_id === student.educator_employee_id &&
-      report.quarter === fullQuarter
-    );
-  };
-
-  const handleDownloadReport = async (quarter: string) => {
-    if (!student) return;
-    
-    setLoadingReport(true);
-    const yearPrefix = currentYear.toString();
-    const fullQuarter = quarter.includes(yearPrefix) ? quarter : quarter.replace(/\d{4}/g, yearPrefix);
-    
-    try {
-      const response = await axios({
-        method: 'post',
-        url: 'https://fast-api-ubv8.onrender.com/generate_report',
-        data: {
-          student_id: student.student_id,
-          program_id: student.program_id,
-          educator_employee_id: student.educator_employee_id,
-          quarter: fullQuarter
-        },
-        responseType: 'blob'
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${student.first_name}_${student.last_name}_${fullQuarter.replace(/\s/g, '_')}_Report.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('Report downloaded successfully');
-    } catch (error: any) {
-      console.error('Error downloading report:', error);
-      
-      if (error.response?.status === 404) {
-        toast.error('No report data found for this student and quarter');
-      } else {
-        toast.error('Failed to download report');
-      }
-    } finally {
-      setLoadingReport(false);
-    }
-  };
-
-  const toggleQuarter = (quarter: string) => {
-    if (expandedQuarter === quarter) {
-      setExpandedQuarter(null);
+    if (tasksError) {
+      console.error('Error fetching tasks:', tasksError);
     } else {
-      setExpandedQuarter(quarter);
+      setTasks(ensureTasksHaveCreatedAt(tasksData));
     }
   };
 
-  const adjustYear = (increment: number) => {
-    const newYear = currentYear + increment;
-    if (YEARS.includes(newYear)) {
-      setCurrentYear(newYear);
+  const handleAddTask = async () => {
+    if (!newTaskDescription || !newTaskDueDate) {
+      alert('Please enter a description and due date for the task.');
+      return;
     }
+
+    setIsAddingTask(true);
+
+    const { data, error } = await supabase
+      .from('student_tasks')
+      .insert([
+        {
+          student_id: parseInt(studentId!),
+          description: newTaskDescription,
+          due_date: newTaskDueDate.toISOString(),
+          completed: false,
+        },
+      ]);
+
+    if (error) {
+      console.error('Error adding task:', error);
+      alert('Failed to add task.');
+    } else {
+      setTasks([...tasks, {
+        id: data![0].id,
+        student_id: parseInt(studentId!),
+        description: newTaskDescription,
+        due_date: newTaskDueDate.toISOString(),
+        completed: false,
+        created_at: new Date().toISOString(),
+      }]);
+      setNewTaskDescription('');
+      setNewTaskDueDate(undefined);
+      alert('Task added successfully!');
+    }
+
+    setIsAddingTask(false);
   };
 
-  if (loading) {
-    return (
-      <Layout
-        title="Loading..."
-        subtitle="Please wait while we fetch the student details"
-        showBackButton
-        onBack={() => window.history.back()}
-      >
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner />
-        </div>
-      </Layout>
-    );
-  }
+  const handleTaskCompletion = async (taskId: number, completed: boolean) => {
+    const { error } = await supabase
+      .from('student_tasks')
+      .update({ completed: !completed })
+      .eq('id', taskId);
+
+    if (error) {
+      console.error('Error updating task:', error);
+      alert('Failed to update task.');
+    } else {
+      setTasks(
+        tasks.map((task) =>
+          task.id === taskId ? { ...task, completed: !completed } : task
+        )
+      );
+    }
+  };
 
   if (!student) {
     return (
-      <Layout
-        title="Student Not Found"
-        subtitle="The requested student could not be found"
-        showBackButton
-        onBack={() => window.history.back()}
-      >
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-gray-500">No student found with ID: {studentId}</p>
-        </div>
+      <Layout title="Student Details">
+        <div>Loading student details...</div>
       </Layout>
     );
   }
 
-  const updatedQuarters = QUARTERS.map(quarter => 
-    quarter.replace(/\d{4}/g, currentYear.toString())
-  );
-
   return (
-    <Layout
-      title={`${student.first_name} ${student.last_name}`}
-      subtitle={`Student ID: ${student.student_id} | Program ID: ${student.program_id}`}
-      showBackButton
-      onBack={() => window.history.back()}
-    >
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <h3 className="font-medium text-gray-500">Student Information</h3>
-                <p className="mt-1"><strong>Name:</strong> {student.first_name} {student.last_name}</p>
-                <p><strong>Student ID:</strong> {student.student_id}</p>
-                <p><strong>Gender:</strong> {student.gender}</p>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-500">Program Information</h3>
-                <p className="mt-1"><strong>Program ID:</strong> {student.program_id}</p>
-                <p><strong>Educator ID:</strong> {student.educator_employee_id}</p>
-                <p><strong>Center ID:</strong> {student.center_id}</p>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-500">Attendance Summary</h3>
-                <p className="mt-1"><strong>Present:</strong> {attendance.present} days</p>
-                <p><strong>Absent:</strong> {attendance.absent} days</p>
-                <p><strong>Attendance Rate:</strong> {
-                  attendance.present + attendance.absent > 0 
-                    ? `${Math.round((attendance.present / (attendance.present + attendance.absent)) * 100)}%` 
-                    : 'N/A'
-                }</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <Layout title={`Student Details - ${student.name}`}>
+      <div>
+        <h2 className="text-2xl font-semibold mb-4">Student: {student.name}</h2>
+        <p>Email: {student.email}</p>
+        <p>Date of Birth: {student.date_of_birth}</p>
 
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => adjustYear(-1)}
-            disabled={!YEARS.includes(currentYear - 1)}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="font-semibold">{currentYear}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => adjustYear(1)}
-            disabled={!YEARS.includes(currentYear + 1)}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {updatedQuarters.map((quarter) => {
-            const performance = getQuarterlyPerformance(quarter);
-            const report = getQuarterlyReport(quarter);
-            const isExpanded = expandedQuarter === quarter;
-
-            return (
-              <Card key={quarter} className={`border-l-4 ${isExpanded ? 'border-l-ishanya-green' : 'border-l-gray-200'}`}>
-                <CardHeader 
-                  className="flex flex-row items-center justify-between cursor-pointer"
-                  onClick={() => toggleQuarter(quarter)}
-                >
-                  <CardTitle className="text-lg">{quarter}</CardTitle>
-                  <Button variant="ghost" size="sm">
-                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold mb-2">Tasks:</h3>
+          <ul>
+            {tasks.map((task) => (
+              <li key={task.id} className="flex items-center justify-between py-2 border-b border-gray-200">
+                <div>
+                  <span className={task.completed ? 'line-through text-gray-500' : ''}>
+                    {task.description} (Due: {new Date(task.due_date).toLocaleDateString()})
+                  </span>
+                </div>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleTaskCompletion(task.id, task.completed)}
+                  >
+                    {task.completed ? 'Mark Incomplete' : 'Mark Complete'}
                   </Button>
-                </CardHeader>
-                
-                {isExpanded && (
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h3 className="font-semibold mb-3">Performance Records</h3>
-                        {performance ? (
-                          <div className="space-y-3">
-                            <p><strong>Area of Development:</strong> {performance.area_of_development}</p>
-                            
-                            {Object.entries(performance).map(([key, value]) => {
-                              if (['id', 'student_id', 'program_id', 'educator_employee_id', 'quarter', 'area_of_development'].includes(key) || value === null) {
-                                return null;
-                              }
-                              
-                              const displayKey = key.includes('_') 
-                                ? `${key.split('_')[1].charAt(0).toUpperCase() + key.split('_')[1].slice(1)} ${key.split('_')[0]}` 
-                                : key.charAt(0).toUpperCase() + key.slice(1);
-                              
-                              return (
-                                <p key={key}><strong>{displayKey}:</strong> {value}</p>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500">No performance records available for this quarter.</p>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <h3 className="font-semibold mb-3">General Report</h3>
-                        {report ? (
-                          <div className="space-y-3">
-                            {report.punctuality && <p><strong>Punctuality:</strong> {report.punctuality}</p>}
-                            {report.preparedness && <p><strong>Preparedness:</strong> {report.preparedness}</p>}
-                            {report.assistance_required && <p><strong>Assistance Required:</strong> {report.assistance_required}</p>}
-                            {report.parental_support && <p><strong>Parental Support:</strong> {report.parental_support}</p>}
-                            {report.any_behavioral_issues && <p><strong>Behavioral Issues:</strong> {report.any_behavioral_issues}</p>}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500">No general report available for this quarter.</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 flex justify-end">
-                      <Button 
-                        onClick={() => handleDownloadReport(quarter)}
-                        disabled={loadingReport || (!performance && !report)}
-                        className="bg-ishanya-green hover:bg-ishanya-green/80 text-white"
-                      >
-                        {loadingReport ? <LoadingSpinner size="sm" /> : (
-                          <>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Student's Report
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Tasks and Goals</h2>
-          {tasks.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feedback</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {tasks.map((task) => (
-                    <tr key={task.task_id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.title}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{task.description || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${task.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
-                            'bg-yellow-100 text-yellow-800'}`}>
-                          {task.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(task.due_date).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{task.priority}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.category}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{task.feedback || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold mb-2">Add New Task:</h3>
+          <div className="grid gap-4">
+            <div>
+              <Label htmlFor="taskDescription">Description:</Label>
+              <Input
+                type="text"
+                id="taskDescription"
+                value={newTaskDescription}
+                onChange={(e) => setNewTaskDescription(e.target.value)}
+              />
             </div>
-          ) : (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-gray-500">No tasks or goals assigned to this student.</p>
+            <div>
+              <Label>Due Date:</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !newTaskDueDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newTaskDueDate ? (
+                      format(newTaskDueDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                  <Calendar
+                    mode="single"
+                    selected={newTaskDueDate}
+                    onSelect={setNewTaskDueDate}
+                    disabled={(date) =>
+                      date < new Date()
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-          )}
+            <Button onClick={handleAddTask} disabled={isAddingTask}>
+              {isAddingTask ? 'Adding Task...' : 'Add Task'}
+            </Button>
+          </div>
         </div>
       </div>
     </Layout>
