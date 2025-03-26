@@ -29,10 +29,19 @@ interface StudentData {
   [key: string]: any;
 }
 
+interface TaskData {
+  id: number;
+  student_id: number;
+  description: string;
+  due_date: string;
+  completed: boolean;
+  created_at: string;
+}
+
 const StudentDetails = () => {
   const { studentId } = useParams<{ studentId: string }>();
   const [student, setStudent] = useState<StudentData | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskData[]>([]);
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -66,9 +75,9 @@ const StudentDetails = () => {
     }
 
     try {
-      // Use a direct query instead of RPC
+      // Use the specific table name available in the database
       const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
+        .from('student_tasks') // Using student_tasks table instead of tasks
         .select('*')
         .eq('student_id', parseInt(studentId));
 
@@ -76,7 +85,7 @@ const StudentDetails = () => {
         console.error('Error fetching tasks:', tasksError);
         setTasks([]);
       } else if (tasksData) {
-        setTasks(ensureTasksHaveCreatedAt(tasksData));
+        setTasks(tasksData as TaskData[]);
       } else {
         setTasks([]);
       }
@@ -95,9 +104,9 @@ const StudentDetails = () => {
     setIsAddingTask(true);
 
     try {
-      // Use a direct insert instead of RPC
+      // Use the specific table available in the database
       const { error } = await supabase
-        .from('tasks')
+        .from('student_tasks') // Using student_tasks table instead of tasks
         .insert({
           student_id: parseInt(studentId!),
           description: newTaskDescription,
@@ -126,9 +135,9 @@ const StudentDetails = () => {
 
   const handleTaskCompletion = async (taskId: number, completed: boolean) => {
     try {
-      // Use a direct update instead of RPC
+      // Use the specific table available in the database
       const { error } = await supabase
-        .from('tasks')
+        .from('student_tasks') // Using student_tasks table instead of tasks
         .update({ completed: !completed })
         .eq('id', taskId);
 

@@ -1,155 +1,250 @@
-
-import { useState, useRef, ChangeEvent } from 'react';
-import Papa from 'papaparse';
-import { bulkInsert } from '@/lib/api';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, AlertOctagon } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, Download, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast } from 'sonner';
+import { bulkInsertData } from '@/lib/api';
 
-export type CsvUploadProps = {
+type CsvUploadProps = {
   tableName: string;
   onSuccess: () => void;
-  onClose?: () => void;
-  onCancel?: () => void;
+  onClose: () => void;
 };
 
-const CsvUpload = ({ tableName, onSuccess, onClose, onCancel }: CsvUploadProps) => {
+interface BulkInsertResponse {
+  success: boolean;
+  message: string;
+}
+
+const CsvUpload = ({ tableName, onSuccess, onClose }: CsvUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
+  const [step, setStep] = useState(1);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile && selectedFile.type === 'text/csv') {
+    if (selectedFile) {
       setFile(selectedFile);
-      setError(null);
-    } else {
-      setFile(null);
-      setError('Please select a valid CSV file');
+      parseCSV(selectedFile);
     }
   };
-
+  
+  const parseCSV = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n');
+      
+      if (lines.length > 0) {
+        const csvHeaders = lines[0].split(',').map(header => header.trim());
+        setHeaders(csvHeaders);
+        
+        // Create initial mappings (direct mapping)
+        const initialMappings: Record<string, string> = {};
+        csvHeaders.forEach(header => {
+          initialMappings[header] = header.toLowerCase();
+        });
+        setMappings(initialMappings);
+        
+        // Parse records (skip header)
+        const parsedRecords = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i].trim()) {
+            const values = lines[i].split(',').map(value => value.trim());
+            const record: Record<string, string> = {};
+            csvHeaders.forEach((header, index) => {
+              record[header] = values[index] || '';
+            });
+            parsedRecords.push(record);
+          }
+        }
+        setRecords(parsedRecords);
+        setStep(2);
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  const handleMappingChange = (csvHeader: string, dbField: string) => {
+    setMappings(prev => ({
+      ...prev,
+      [csvHeader]: dbField
+    }));
+  };
+  
   const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a CSV file first');
-      return;
-    }
-
-    setIsUploading(true);
+    setUploading(true);
     setError(null);
-
+    
     try {
-      const text = await file.text();
-
-      Papa.parse(text, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          if (results.errors.length > 0) {
-            setError(`CSV parsing error: ${results.errors[0].message}`);
-            setIsUploading(false);
-            return;
+      // Map the records using the defined mappings
+      const mappedRecords = records.map(record => {
+        const mappedRecord: Record<string, any> = {};
+        Object.keys(mappings).forEach(csvHeader => {
+          const dbField = mappings[csvHeader];
+          if (dbField) {
+            mappedRecord[dbField] = record[csvHeader];
           }
-
-          const rows = results.data.map((row) => {
-            return Object.fromEntries(
-              Object.entries(row).map(([key, value]) => {
-                if (value === '') return [key, null]; // Convert empty strings to null
-                if (!isNaN(Number(value))) return [key, Number(value)]; // Convert numeric values
-                return [key, value];
-              })
-            );
-          });
-
-          // Automatically add created_at if missing
-          const finalRows = rows.map((row) => ({
-            ...row,
-            created_at: row.created_at || new Date().toISOString(),
-          }));
-
-          console.log(`Parsed ${finalRows.length} rows from CSV for ${tableName}`, finalRows);
-
-          if (finalRows.length === 0) {
-            setError('CSV file contains no data');
-            setIsUploading(false);
-            return;
-          }
-
-          try {
-            const result = await bulkInsert(tableName, finalRows);
-            setIsUploading(false);
-
-            if (result.success) {
-              toast.success(result.message);
-              onSuccess();
-              if (onClose) onClose();
-            } else {
-              setError(result.message);
-            }
-          } catch (err: any) {
-            setError(err.message || 'Error uploading data');
-            setIsUploading(false);
-          }
-        },
-        error: (error) => {
-          setError(`CSV parsing error: ${error.message}`);
-          setIsUploading(false);
-        },
+        });
+        return mappedRecord;
       });
-    } catch (err: any) {
-      setError(err.message || 'Error reading file');
-      setIsUploading(false);
+      
+      // Use the bulk insert function with proper response type handling
+      const result = await bulkInsertData(tableName, mappedRecords) as BulkInsertResponse;
+      
+      if (result.success) {
+        toast.success('Data uploaded successfully');
+        onSuccess();
+      } else {
+        setError(result.message || 'Failed to upload data');
+      }
+    } catch (error: any) {
+      console.error('Error uploading data:', error);
+      setError(error.message || 'An unexpected error occurred');
+    } finally {
+      setUploading(false);
     }
   };
-
+  
+  const downloadTemplate = () => {
+    // Create a template CSV based on the table name
+    let csvContent = '';
+    
+    switch (tableName.toLowerCase()) {
+      case 'students':
+        csvContent = 'first_name,last_name,gender,dob,student_email,contact_number,address,program_id,center_id\n';
+        csvContent += 'John,Doe,Male,2000-01-01,john@example.com,1234567890,123 Main St,1,1\n';
+        break;
+      case 'employees':
+        csvContent = 'name,employee_id,email,designation,department,date_of_joining,contact_number,center_id\n';
+        csvContent += 'Jane Smith,1001,jane@example.com,Manager,Administration,2022-01-01,9876543210,1\n';
+        break;
+      case 'educators':
+        csvContent = 'name,educator_id,email,designation,subject,date_of_joining,contact_number,center_id,program_id\n';
+        csvContent += 'Alice Johnson,2001,alice@example.com,Teacher,Mathematics,2022-01-01,5555555555,1,1\n';
+        break;
+      default:
+        csvContent = 'No template available for this table';
+    }
+    
+    // Create a download link
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `${tableName}_template.csv`);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-sm text-gray-600">
-          Upload a CSV file with the following columns:
-        </p>
-        <div className="bg-gray-50 p-3 rounded-md border text-xs">
-          <code>
-            {tableName === 'students' && 'first_name, last_name, gender, dob, enrollment_year, status, address, contact_number, center_id, program_id'}
-            {tableName === 'educators' && 'name, designation, email, phone, date_of_birth, date_of_joining, center_id'}
-            {tableName === 'employees' && 'name, gender, designation, department, employment_type, email, phone, date_of_birth, status, center_id'}
-            {tableName === 'courses' && 'name, duration_weeks, max_students, description, start_date, end_date, center_id, program_id'}
-          </code>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <Input
-          type="file"
-          accept=".csv"
-          onChange={handleFileChange}
-          ref={fileInputRef}
-          className="flex-1"
-        />
-        <Button 
-          type="button" 
-          onClick={handleUpload}
-          disabled={!file || isUploading}
-          className="bg-ishanya-green hover:bg-ishanya-green/90"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {isUploading ? 'Uploading...' : 'Upload'}
-        </Button>
-      </div>
-
       {error && (
-        <div className="flex items-start text-sm text-red-600 gap-2 p-2 bg-red-50 rounded-md">
-          <AlertOctagon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>{error}</span>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {step === 1 && (
+        <div className="space-y-4">
+          <div className="flex justify-between">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={downloadTemplate}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Template
+            </Button>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="csv-file">Select CSV File</Label>
+            <Input
+              id="csv-file"
+              type="file"
+              accept=".csv"
+              onChange={handleFileChange}
+              ref={fileInputRef}
+            />
+            <p className="text-sm text-muted-foreground">
+              Please ensure your CSV file has a header row and follows the expected format.
+            </p>
+          </div>
         </div>
       )}
-
-      {file && (
-        <p className="text-sm text-gray-600">
-          Selected file: <span className="font-medium">{file.name}</span> ({(file.size / 1024).toFixed(2)} KB)
-        </p>
+      
+      {step === 2 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Map CSV Headers to Database Fields</h3>
+          <p className="text-sm text-muted-foreground">
+            Select which field in your CSV corresponds to each database field.
+          </p>
+          
+          <div className="space-y-2">
+            {headers.map(header => (
+              <div key={header} className="grid grid-cols-2 gap-2 items-center">
+                <div className="text-sm font-medium">{header}</div>
+                <select
+                  className="border rounded p-1 text-sm w-full"
+                  value={mappings[header] || ''}
+                  onChange={(e) => handleMappingChange(header, e.target.value)}
+                >
+                  <option value="">-- Skip this field --</option>
+                  <option value={header.toLowerCase()}>{header.toLowerCase()}</option>
+                  <option value="name">name</option>
+                  <option value="email">email</option>
+                  <option value="phone">phone</option>
+                  <option value="address">address</option>
+                  <option value="center_id">center_id</option>
+                  <option value="program_id">program_id</option>
+                  {/* Add more options based on the actual table schema */}
+                </select>
+              </div>
+            ))}
+          </div>
+          
+          <p className="text-sm">
+            Records to import: <strong>{records.length}</strong>
+          </p>
+          
+          <div className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setStep(1)}
+              disabled={uploading}
+            >
+              Back
+            </Button>
+            <Button 
+              onClick={handleUpload}
+              disabled={uploading || records.length === 0}
+            >
+              {uploading ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Data
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

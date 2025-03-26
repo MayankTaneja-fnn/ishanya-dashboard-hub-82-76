@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +15,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import VoiceInputDialog from '@/components/ui/VoiceInputDialog';
+import * as api from '@/lib/api'; // Import as a namespace instead of default
 
 const DataManager = () => {
   const [activeTab, setActiveTab] = useState('students');
@@ -160,42 +160,86 @@ const DataManager = () => {
       let result;
       
       if (activeTab === 'students') {
-        const { data: studentData, error } = await supabase
+        // Make sure to include all required fields for students
+        const studentData = {
+          ...data,
+          created_at: new Date().toISOString(),
+          // Ensure the following required fields have default values if not provided
+          student_id: data.student_id || Math.floor(Math.random() * 10000),
+          enrollment_year: data.enrollment_year || new Date().getFullYear(),
+          gender: data.gender || 'Not Specified',
+          status: data.status || 'Active',
+          educator_employee_id: data.educator_employee_id || 1,
+          center_id: Number(data.center_id) || 1,
+          program_id: Number(data.program_id) || 1,
+          contact_number: data.contact_number || '0000000000',
+          dob: data.dob || '2000-01-01'
+        };
+
+        const { data: insertedData, error } = await supabase
           .from('students')
-          .insert({
-            ...data,
-            created_at: new Date().toISOString(),
-          })
+          .insert(studentData)
           .select();
 
         if (error) throw error;
-        result = studentData;
+        result = insertedData;
         toast.success('Student created successfully via voice input');
       } 
       else if (activeTab === 'educators') {
-        const { data: educatorData, error } = await supabase
+        // Make sure to include all required fields for educators
+        const educatorData = {
+          ...data,
+          created_at: new Date().toISOString(),
+          // Ensure the following required fields have default values if not provided
+          employee_id: data.employee_id || Math.floor(Math.random() * 10000),
+          name: data.name || 'Unknown',
+          designation: data.designation || 'Teacher',
+          email: data.email || `educator${Math.floor(Math.random() * 10000)}@example.com`,
+          phone: data.phone || '0000000000',
+          date_of_birth: data.date_of_birth || '1980-01-01',
+          date_of_joining: data.date_of_joining || new Date().toISOString().split('T')[0],
+          work_location: data.work_location || 'Main Campus',
+          center_id: Number(data.center_id) || 1
+        };
+
+        const { data: insertedData, error } = await supabase
           .from('educators')
-          .insert({
-            ...data,
-            created_at: new Date().toISOString(),
-          })
+          .insert(educatorData)
           .select();
 
         if (error) throw error;
-        result = educatorData;
+        result = insertedData;
         toast.success('Educator created successfully via voice input');
       }
       else if (activeTab === 'employees') {
-        const { data: employeeData, error } = await supabase
+        // Make sure to include all required fields for employees
+        const employeeData = {
+          ...data,
+          created_at: new Date().toISOString(),
+          // Ensure the following required fields have default values if not provided
+          employee_id: data.employee_id || Math.floor(Math.random() * 10000),
+          name: data.name || 'Unknown',
+          gender: data.gender || 'Not Specified',
+          designation: data.designation || 'Staff',
+          department: data.department || 'Administration',
+          employment_type: data.employment_type || 'Full-Time',
+          email: data.email || `employee${Math.floor(Math.random() * 10000)}@example.com`,
+          phone: data.phone || '0000000000',
+          date_of_birth: data.date_of_birth || '1980-01-01',
+          date_of_joining: data.date_of_joining || new Date().toISOString().split('T')[0],
+          emergency_contact_name: data.emergency_contact_name || 'Emergency Contact',
+          emergency_contact: data.emergency_contact || '0000000000',
+          center_id: Number(data.center_id) || 1,
+          password: data.password || 'defaultpassword'
+        };
+
+        const { data: insertedData, error } = await supabase
           .from('employees')
-          .insert({
-            ...data,
-            created_at: new Date().toISOString(),
-          })
+          .insert(employeeData)
           .select();
 
         if (error) throw error;
-        result = employeeData;
+        result = insertedData;
         toast.success('Employee created successfully via voice input');
       }
       
@@ -232,14 +276,22 @@ const DataManager = () => {
   const onSubmitStudent = async (data: z.infer<typeof studentSchema>) => {
     setIsLoading(true);
     try {
-      const { data: studentData, error } = await supabase
+      const studentData = {
+        ...data,
+        created_at: new Date().toISOString(),
+        program_id: parseInt(data.program_id),
+        center_id: parseInt(data.center_id),
+        // Add required fields with default values if not provided by the form
+        student_id: Math.floor(Math.random() * 10000),
+        enrollment_year: new Date().getFullYear(),
+        gender: 'Not Specified',
+        status: 'Active',
+        educator_employee_id: 1
+      };
+
+      const { data: insertedData, error } = await supabase
         .from('students')
-        .insert({
-          ...data,
-          created_at: new Date().toISOString(),
-          program_id: parseInt(data.program_id),
-          center_id: parseInt(data.center_id),
-        })
+        .insert(studentData)
         .select();
 
       if (error) {
@@ -262,13 +314,23 @@ const DataManager = () => {
   const onSubmitEmployee = async (data: z.infer<typeof employeeSchema>) => {
     setIsLoading(true);
     try {
-      const { data: employeeData, error } = await supabase
+      const employeeData = {
+        ...data,
+        created_at: new Date().toISOString(),
+        center_id: parseInt(data.center_id),
+        date_of_birth: '1980-01-01', // Default value for required field
+        gender: 'Not Specified', // Default value for required field
+        emergency_contact: '0000000000', // Default value for required field
+        emergency_contact_name: 'Emergency Contact', // Default value for required field
+        employment_type: 'Full-Time', // Default value for required field
+        phone: data.contact_number, // Map contact_number to phone
+        password: 'defaultpassword', // Default value for required field
+        employee_id: parseInt(data.employee_id || '0')
+      };
+
+      const { data: insertedData, error } = await supabase
         .from('employees')
-        .insert({
-          ...data,
-          created_at: new Date().toISOString(),
-          center_id: parseInt(data.center_id),
-        })
+        .insert(employeeData)
         .select();
 
       if (error) {
@@ -291,14 +353,24 @@ const DataManager = () => {
   const onSubmitEducator = async (data: z.infer<typeof educatorSchema>) => {
     setIsLoading(true);
     try {
-      const { data: educatorData, error } = await supabase
+      const educatorData = {
+        // Only include fields that are valid for the educators table
+        name: data.name,
+        date_of_birth: data.date_of_joining, // Required field
+        date_of_joining: data.date_of_joining,
+        designation: data.designation,
+        email: data.email,
+        center_id: parseInt(data.center_id),
+        employee_id: parseInt(data.educator_id),
+        phone: data.contact_number,
+        work_location: 'Main Campus', // Required field with default value
+        created_at: new Date().toISOString()
+        // Note: program_id is not used in educators table
+      };
+
+      const { data: insertedData, error } = await supabase
         .from('educators')
-        .insert({
-          ...data,
-          created_at: new Date().toISOString(),
-          program_id: parseInt(data.program_id),
-          center_id: parseInt(data.center_id),
-        })
+        .insert(educatorData)
         .select();
 
       if (error) {
@@ -745,168 +817,3 @@ const DataManager = () => {
                     control={educatorForm.control}
                     name="center_id"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Center <span className="text-red-500">*</span></FormLabel>
-                        <Select 
-                          onValueChange={(value) => handleCenterChange(value, 'educator')}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a center" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {centers.map((center) => (
-                              <SelectItem key={center.center_id} value={center.center_id.toString()}>
-                                {center.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="program_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Program <span className="text-red-500">*</span></FormLabel>
-                        <Select 
-                          onValueChange={(value) => handleProgramChange(value, 'educator')}
-                          disabled={!selectedCenter}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a program" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {programs.map((program) => (
-                              <SelectItem key={program.program_id} value={program.program_id.toString()}>
-                                {program.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="educator_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Educator ID <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter educator ID (e.g., T12345)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter full name (e.g., Jane Smith)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter email (e.g., educator@example.com)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="designation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Designation <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter designation (e.g., Teacher)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="subject"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Subject <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter subject (e.g., Mathematics)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="date_of_joining"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Joining <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="YYYY-MM-DD (e.g., 2022-01-15)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={educatorForm.control}
-                    name="contact_number"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Number <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter contact number (e.g., 9876543210)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-ishanya-yellow hover:bg-ishanya-yellow/90"
-                  disabled={isLoading}
-                >
-                  {isLoading ? <LoadingSpinner size="sm" /> : "Add Educator"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-
-        <VoiceInputDialog 
-          isOpen={showVoiceInputDialog}
-          onClose={() => setShowVoiceInputDialog(false)}
-          table={activeTab}
-          onComplete={handleVoiceInputComplete}
-        />
-      </CardContent>
-    </Card>
-  );
-};
-
-export default DataManager;
