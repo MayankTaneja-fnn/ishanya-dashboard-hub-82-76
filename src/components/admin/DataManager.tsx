@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Form } from '@/components/ui/form';
 import { toast } from 'sonner';
-import { Center, Program, TableInfo, TableColumn } from '@/lib/api';
+import { Center, Program, TableInfo, TableColumn, fetchTableColumns } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import TableListWrapper from '@/components/tables/TableListWrapper';
 import TableView from '@/components/tables/TableView';
@@ -45,7 +46,7 @@ const DataManager = () => {
 
   useEffect(() => {
     if (selectedTable) {
-      fetchTableColumns(selectedTable.name);
+      fetchTableColumnData(selectedTable.name);
     }
   }, [selectedTable]);
 
@@ -84,15 +85,12 @@ const DataManager = () => {
     }
   };
 
-  const fetchTableColumns = async (table: string) => {
+  const fetchTableColumnData = async (table: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('table_columns')
-        .select('*')
-        .eq('table_name', table);
-      if (error) throw error;
-      setTableColumns(data || []);
+      // Use the fetchTableColumns function from api.ts instead
+      const columns = await fetchTableColumns(table);
+      setTableColumns(columns || []);
     } catch (error: any) {
       console.error('Error fetching table columns:', error);
       toast.error(`Failed to load table columns: ${error.message}`);
@@ -101,15 +99,15 @@ const DataManager = () => {
     }
   };
 
-  const handleCenterSelect = (centerId: number) => {
-    const center = centers.find((c) => c.center_id === centerId);
+  const handleCenterSelect = (centerId: string) => {
+    const center = centers.find((c) => c.center_id === parseInt(centerId, 10));
     setSelectedCenter(center || null);
     setSelectedProgram(null);
     setSelectedTable(null);
   };
 
-  const handleProgramSelect = (programId: number) => {
-    const program = programs.find((p) => p.program_id === programId);
+  const handleProgramSelect = (programId: string) => {
+    const program = programs.find((p) => p.program_id === parseInt(programId, 10));
     setSelectedProgram(program || null);
     setSelectedTable(null);
   };
@@ -139,21 +137,27 @@ const DataManager = () => {
           last_name: formData.last_name || '',
           gender: formData.gender || 'Unspecified',
           dob: formData.dob || new Date().toISOString().split('T')[0],
-          student_id: formData.student_id || Math.floor(Math.random() * 10000),
-          enrollment_year: formData.enrollment_year || new Date().getFullYear(),
+          student_id: parseInt(formData.student_id || '0', 10),
+          enrollment_year: parseInt(formData.enrollment_year || new Date().getFullYear().toString(), 10),
           status: formData.status || 'Active',
           student_email: formData.student_email || '',
           contact_number: formData.contact_number || '',
           
-          ...formData,
-          
           created_at: now
         };
+        
+        // Copy any additional fields
+        for (const key in formData) {
+          if (!(key in studentData) && formData[key]) {
+            studentData[key] = formData[key];
+          }
+        }
+        
         dataToInsert = studentData;
       } else if (table === 'educators') {
         const educatorData = {
           center_id: parseInt(formData.center_id || '0', 10),
-          employee_id: parseInt(formData.employee_id || Math.floor(Math.random() * 10000), 10),
+          employee_id: parseInt(formData.employee_id || '0', 10),
           name: formData.name || 'New Educator',
           designation: formData.designation || 'Teacher',
           email: formData.email || 'educator@example.com',
@@ -161,16 +165,21 @@ const DataManager = () => {
           date_of_birth: formData.date_of_birth || new Date().toISOString().split('T')[0],
           date_of_joining: formData.date_of_joining || new Date().toISOString().split('T')[0],
           work_location: formData.work_location || '',
-          
-          ...formData,
-          
           created_at: now
         };
+        
+        // Copy any additional fields
+        for (const key in formData) {
+          if (!(key in educatorData) && formData[key]) {
+            educatorData[key] = formData[key];
+          }
+        }
+        
         dataToInsert = educatorData;
       } else if (table === 'employees') {
         const employeeData = {
           center_id: parseInt(formData.center_id || '0', 10),
-          employee_id: parseInt(formData.employee_id || Math.floor(Math.random() * 10000), 10),
+          employee_id: parseInt(formData.employee_id || '0', 10),
           name: formData.name || 'New Employee',
           gender: formData.gender || 'Unspecified',
           designation: formData.designation || 'Staff',
@@ -182,14 +191,19 @@ const DataManager = () => {
           date_of_joining: formData.date_of_joining || new Date().toISOString().split('T')[0],
           emergency_contact_name: formData.emergency_contact_name || '',
           emergency_contact: formData.emergency_contact || '',
-          
-          ...formData,
-          
           created_at: now
         };
-        delete employeeData.program_id;
+        
+        // Copy any additional fields
+        for (const key in formData) {
+          if (!(key in employeeData) && formData[key]) {
+            employeeData[key] = formData[key];
+          }
+        }
+        
         dataToInsert = employeeData;
       } else {
+        // For other tables, simply add the created_at field
         dataToInsert = {
           ...formData,
           created_at: now
@@ -229,7 +243,7 @@ const DataManager = () => {
               <Label htmlFor="center">Center</Label>
               <Select
                 value={selectedCenter?.center_id.toString() || ''}
-                onValueChange={(value) => handleCenterSelect(parseInt(value, 10))}
+                onValueChange={(value) => handleCenterSelect(value)}
               >
                 <SelectTrigger id="center">
                   <SelectValue placeholder="Select a center" />
@@ -248,7 +262,7 @@ const DataManager = () => {
               <Label htmlFor="program">Program</Label>
               <Select
                 value={selectedProgram?.program_id.toString() || ''}
-                onValueChange={(value) => handleProgramSelect(parseInt(value, 10))}
+                onValueChange={(value) => handleProgramSelect(value)}
                 disabled={!selectedCenter}
               >
                 <SelectTrigger id="program">
@@ -309,7 +323,7 @@ const DataManager = () => {
               </div>
             ) : (
               <TableView
-                tableInfo={selectedTable}
+                table={selectedTable.name}
                 onRecordDeleted={fetchTableData}
                 onRecordUpdated={fetchTableData}
               />
@@ -323,7 +337,7 @@ const DataManager = () => {
           <DialogHeader>
             <DialogTitle>Add New Record to {selectedTable?.name}</DialogTitle>
           </DialogHeader>
-          <Form>
+          <div>
             <form onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
@@ -359,7 +373,7 @@ const DataManager = () => {
                 </Button>
               </DialogFooter>
             </form>
-          </Form>
+          </div>
         </DialogContent>
       </Dialog>
       
@@ -367,7 +381,7 @@ const DataManager = () => {
         <CsvUpload
           tableName={selectedTable.name}
           onClose={() => setShowCsvUpload(false)}
-          onUploadComplete={() => {
+          onSuccess={() => {
             setShowCsvUpload(false);
             fetchTableData();
           }}

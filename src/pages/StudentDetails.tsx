@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ensureTasksHaveCreatedAt, Task } from '@/lib/api';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 interface StudentData {
   id: string;
@@ -74,14 +75,26 @@ const StudentDetails = () => {
     try {
       setTasksLoading(true);
       
+      // Create a custom RPC function or use a view if needed
+      // For now, let's query the tasks table directly
       const { data, error } = await supabase
-        .from('tasks')
+        .from('student_tasks')
         .select('*')
         .eq('student_id', studentId);
         
       if (error) throw error;
       
-      setTasks(data || []);
+      // Ensure all tasks have a created_at field
+      const tasksWithCreatedAt = data?.map(task => ({
+        id: task.id,
+        student_id: task.student_id,
+        description: task.description,
+        due_date: task.due_date,
+        completed: task.completed || false,
+        created_at: task.created_at || new Date().toISOString()
+      })) || [];
+      
+      setTasks(tasksWithCreatedAt);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast.error('Failed to load student tasks');
@@ -96,14 +109,16 @@ const StudentDetails = () => {
     
     try {
       setTasksLoading(true);
+      setIsAddingTask(true);
       
       const { error } = await supabase
-        .from('tasks')
+        .from('student_tasks')
         .insert({
           student_id: studentId,
           description: newTaskDescription,
           due_date: newTaskDueDate.toISOString(),
-          completed: false
+          completed: false,
+          created_at: new Date().toISOString()
         });
         
       if (error) throw error;
@@ -117,6 +132,7 @@ const StudentDetails = () => {
       toast.error('Failed to add task');
     } finally {
       setTasksLoading(false);
+      setIsAddingTask(false);
     }
   };
 
@@ -125,7 +141,7 @@ const StudentDetails = () => {
       setTasksLoading(true);
       
       const { error } = await supabase
-        .from('tasks')
+        .from('student_tasks')
         .update({ completed: !completed })
         .eq('id', taskId);
         

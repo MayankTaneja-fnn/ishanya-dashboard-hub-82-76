@@ -38,6 +38,13 @@ export interface TableInfo {
   center_id?: number;
 }
 
+export interface TableColumn {
+  name: string;
+  type?: string;
+  required?: boolean;
+  description?: string;
+}
+
 export interface Task {
   id: number;
   student_id: number;
@@ -121,15 +128,56 @@ export const fetchTablesByProgram = async (programId: number): Promise<TableInfo
   }
 };
 
-export const fetchTableColumns = async (tableName: string): Promise<string[]> => {
+export const fetchTableColumns = async (tableName: string): Promise<TableColumn[]> => {
   // In a real application, you might fetch this from API or database metadata
   // For simplicity, we'll return hardcoded columns for common tables
-  const tableColumns: Record<string, string[]> = {
-    students: ['id', 'student_id', 'first_name', 'last_name', 'gender', 'dob', 'enrollment_year', 'status', 'student_email', 'program_id', 'contact_number', 'center_id'],
-    educators: ['id', 'employee_id', 'name', 'designation', 'email', 'phone', 'date_of_birth', 'date_of_joining', 'center_id'],
-    employees: ['id', 'employee_id', 'name', 'gender', 'designation', 'department', 'email', 'phone', 'date_of_birth', 'date_of_joining', 'center_id'],
-    centers: ['id', 'center_id', 'name', 'location', 'num_of_student', 'num_of_educator', 'num_of_employees'],
-    programs: ['id', 'program_id', 'name', 'description', 'center_id']
+  const tableColumns: Record<string, TableColumn[]> = {
+    students: [
+      { name: 'id', type: 'string', required: false },
+      { name: 'student_id', type: 'number', required: true },
+      { name: 'first_name', type: 'string', required: true },
+      { name: 'last_name', type: 'string', required: true },
+      { name: 'gender', type: 'string', required: true },
+      { name: 'dob', type: 'date', required: true },
+      { name: 'enrollment_year', type: 'number', required: true },
+      { name: 'status', type: 'string', required: true },
+      { name: 'student_email', type: 'string', required: true },
+      { name: 'program_id', type: 'number', required: true },
+      { name: 'contact_number', type: 'string', required: true },
+      { name: 'center_id', type: 'number', required: true }
+    ],
+    educators: [
+      { name: 'id', type: 'string', required: false },
+      { name: 'employee_id', type: 'number', required: true },
+      { name: 'name', type: 'string', required: true },
+      { name: 'designation', type: 'string', required: true },
+      { name: 'email', type: 'string', required: true },
+      { name: 'phone', type: 'string', required: true },
+      { name: 'date_of_birth', type: 'date', required: true },
+      { name: 'date_of_joining', type: 'date', required: true },
+      { name: 'center_id', type: 'number', required: true }
+    ],
+    employees: [
+      { name: 'id', type: 'string', required: false },
+      { name: 'employee_id', type: 'number', required: true },
+      { name: 'name', type: 'string', required: true },
+      { name: 'gender', type: 'string', required: true },
+      { name: 'designation', type: 'string', required: true },
+      { name: 'department', type: 'string', required: true },
+      { name: 'email', type: 'string', required: true },
+      { name: 'phone', type: 'string', required: true },
+      { name: 'date_of_birth', type: 'date', required: true },
+      { name: 'date_of_joining', type: 'date', required: true },
+      { name: 'center_id', type: 'number', required: true }
+    ],
+    tasks: [
+      { name: 'id', type: 'number', required: false },
+      { name: 'student_id', type: 'number', required: true },
+      { name: 'description', type: 'string', required: true },
+      { name: 'due_date', type: 'date', required: true },
+      { name: 'completed', type: 'boolean', required: true },
+      { name: 'created_at', type: 'date', required: false }
+    ],
   };
   
   return tableColumns[tableName.toLowerCase()] || [];
@@ -138,7 +186,7 @@ export const fetchTableColumns = async (tableName: string): Promise<string[]> =>
 export const bulkInsert = async (tableName: string, data: any[]): Promise<ApiResponse> => {
   try {
     // Using fixed table names since dynamic table names aren't supported in the type system
-    const allowedTables = ['students', 'educators', 'employees', 'centers', 'programs', 'courses'];
+    const allowedTables = ['students', 'educators', 'employees', 'centers', 'programs', 'courses', 'tasks'];
     
     if (!allowedTables.includes(tableName)) {
       return { 
@@ -148,7 +196,7 @@ export const bulkInsert = async (tableName: string, data: any[]): Promise<ApiRes
     }
     
     const { error } = await supabase
-      .from(tableName as any)
+      .from(tableName)
       .insert(data);
       
     if (error) {

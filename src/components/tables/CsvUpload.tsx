@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +8,13 @@ import { AlertCircle, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast } from 'sonner';
-import { bulkInsertData } from '@/lib/api';
+import { bulkInsert } from '@/lib/api';
 
 type CsvUploadProps = {
   tableName: string;
-  onSuccess: () => void;
+  onSuccess?: () => void;
   onClose: () => void;
+  onUploadComplete?: () => void;
 };
 
 interface BulkInsertResponse {
@@ -20,7 +22,7 @@ interface BulkInsertResponse {
   message: string;
 }
 
-const CsvUpload = ({ tableName, onSuccess, onClose }: CsvUploadProps) => {
+const CsvUpload = ({ tableName, onSuccess, onClose, onUploadComplete }: CsvUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,11 +102,12 @@ const CsvUpload = ({ tableName, onSuccess, onClose }: CsvUploadProps) => {
       });
       
       // Use the bulk insert function with proper response type handling
-      const result = await bulkInsertData(tableName, mappedRecords) as BulkInsertResponse;
+      const result = await bulkInsert(tableName, mappedRecords);
       
       if (result.success) {
         toast.success('Data uploaded successfully');
-        onSuccess();
+        if (onSuccess) onSuccess();
+        if (onUploadComplete) onUploadComplete();
       } else {
         setError(result.message || 'Failed to upload data');
       }
