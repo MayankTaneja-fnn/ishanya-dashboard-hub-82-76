@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -88,7 +87,6 @@ const DataManager = () => {
   const fetchTableColumnData = async (table: string) => {
     try {
       setLoading(true);
-      // Use the fetchTableColumns function from api.ts instead
       const columns = await fetchTableColumns(table);
       setTableColumns(columns || []);
     } catch (error: any) {
@@ -117,7 +115,7 @@ const DataManager = () => {
   };
 
   const fetchTableData = () => {
-    // Placeholder function, actual implementation in TableView
+    setSelectedTable({...selectedTable!});
   };
 
   const handleAddRecord = async (table: string, formData: any) => {
@@ -322,11 +320,7 @@ const DataManager = () => {
                 <LoadingSpinner />
               </div>
             ) : (
-              <TableView
-                table={selectedTable.name}
-                onRecordDeleted={fetchTableData}
-                onRecordUpdated={fetchTableData}
-              />
+              <TableView table={selectedTable.name} />
             )}
           </CardContent>
         </Card>

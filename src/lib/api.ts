@@ -183,10 +183,73 @@ export const fetchTableColumns = async (tableName: string): Promise<TableColumn[
   return tableColumns[tableName.toLowerCase()] || [];
 };
 
+// Create a function that uses RPC call for tables that aren't in the schema
+export const fetchTasksFromRPC = async (studentId: string): Promise<Task[]> => {
+  try {
+    // Using RPC to bypass direct table access restrictions
+    const { data, error } = await supabase
+      .rpc('get_student_tasks', { student_id_param: studentId });
+      
+    if (error) {
+      console.error('Error fetching tasks via RPC:', error);
+      throw error;
+    }
+    
+    return ensureTasksHaveCreatedAt(data || []);
+  } catch (error) {
+    console.error('Exception in fetchTasksFromRPC:', error);
+    return [];
+  }
+};
+
+// Add a function for updating tasks via RPC
+export const updateTaskViaRPC = async (taskId: number, completed: boolean): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('update_task_completion', { 
+        task_id_param: taskId,
+        completed_param: completed
+      });
+      
+    if (error) {
+      console.error('Error updating task via RPC:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception in updateTaskViaRPC:', error);
+    return false;
+  }
+};
+
+// Add a function for creating tasks via RPC
+export const createTaskViaRPC = async (taskData: Omit<Task, 'id' | 'created_at'>): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('create_student_task', { 
+        student_id_param: taskData.student_id,
+        description_param: taskData.description,
+        due_date_param: taskData.due_date,
+        completed_param: taskData.completed || false
+      });
+      
+    if (error) {
+      console.error('Error creating task via RPC:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception in createTaskViaRPC:', error);
+    return false;
+  }
+};
+
 export const bulkInsert = async (tableName: string, data: any[]): Promise<ApiResponse> => {
   try {
     // Using fixed table names since dynamic table names aren't supported in the type system
-    const allowedTables = ['students', 'educators', 'employees', 'centers', 'programs', 'courses', 'tasks'];
+    const allowedTables = ['students', 'educators', 'employees', 'centers', 'programs', 'courses'];
     
     if (!allowedTables.includes(tableName)) {
       return { 
@@ -195,6 +258,7 @@ export const bulkInsert = async (tableName: string, data: any[]): Promise<ApiRes
       };
     }
     
+    // Use Supabase to insert data
     const { error } = await supabase
       .from(tableName)
       .insert(data);
@@ -227,7 +291,10 @@ const api = {
   fetchProgramsByCenter,
   fetchTablesByProgram,
   fetchTableColumns,
-  bulkInsert
+  bulkInsert,
+  fetchTasksFromRPC,
+  updateTaskViaRPC,
+  createTaskViaRPC
 };
 
 export default api;

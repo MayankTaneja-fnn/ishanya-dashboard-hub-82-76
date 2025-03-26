@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { fetchTableColumns } from '@/lib/api';
+import { fetchTableColumns, TableColumn } from '@/lib/api';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TableActions from './TableActions';
@@ -143,7 +143,8 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
   const userRole = user?.role || '';
   
   const [data, setData] = useState<RecordWithID[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
+  const [columns, setColumns] = useState<TableColumn[]>([]);
+  const [displayColumns, setDisplayColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,6 +175,7 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
         }
         
         setColumns(columnsData);
+        setDisplayColumns(columnsData.map(col => col.name));
         
         let query = supabase.from(tableName).select('*');
         
@@ -216,7 +218,7 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
         
         const defaultFormData: Record<string, any> = {};
         columnsData.forEach(col => {
-          defaultFormData[col] = '';
+          defaultFormData[col.name] = '';
         });
         
         if (table.center_id) {
@@ -279,7 +281,7 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
     
     const rowFormData: Record<string, any> = {};
     columns.forEach(col => {
-      rowFormData[col] = row[col] !== null ? row[col] : '';
+      rowFormData[col.name] = row[col.name] !== null ? row[col.name] : '';
     });
     
     setFormData(rowFormData);
@@ -530,10 +532,10 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
           const tableName = table.name.toLowerCase();
           
           columns.forEach(col => {
-            if (col === 'student_id' || col === 'employee_id' || col === 'center_id') {
-              defaultFormData[col] = lastRecordId ? lastRecordId + 1 : 1;
+            if (col.name === 'student_id' || col.name === 'employee_id' || col.name === 'center_id') {
+              defaultFormData[col.name] = lastRecordId ? lastRecordId + 1 : 1;
             } else {
-              defaultFormData[col] = '';
+              defaultFormData[col.name] = '';
             }
           });
           
@@ -594,7 +596,7 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Columns</SelectItem>
-                    {columns.slice(0, 10).map((column) => (
+                    {displayColumns.slice(0, 10).map((column) => (
                       <SelectItem key={column} value={column}>
                         {capitalizeFirstLetter(column)}
                       </SelectItem>
@@ -629,7 +631,7 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.slice(0, 6).map((column) => (
+                {displayColumns.slice(0, 6).map((column) => (
                   <TableHead key={column}>
                     {capitalizeFirstLetter(column)}
                   </TableHead>
@@ -640,14 +642,14 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
             <TableBody>
               {filteredData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={columns.slice(0, 6).length + 1} className="h-24 text-center">
+                  <TableCell colSpan={displayColumns.slice(0, 6).length + 1} className="h-24 text-center">
                     No records found
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredData.map((row) => (
                   <TableRow key={row.id || row.student_id || row.employee_id}>
-                    {columns.slice(0, 6).map((column) => (
+                    {displayColumns.slice(0, 6).map((column) => (
                       <TableCell key={column}>
                         {column === 'password' ? 
                           '••••••••' : 
@@ -705,20 +707,20 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
             )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {columns.filter(col => col !== 'id').map((column) => {
-                if (column === 'password' && 
+              {columns.filter(col => col.name !== 'id').map((column) => {
+                if (column.name === 'password' && 
                     !isFormEditing && 
                     userRole !== 'administrator') {
                   return null;
                 }
                 
-                if (column === 'photo' && isFormEditing) {
+                if (column.name === 'photo' && isFormEditing) {
                   return (
-                    <div key={column} className="space-y-2">
+                    <div key={column.name} className="space-y-2">
                       <Label>
-                        {capitalizeFirstLetter(column)}
+                        {capitalizeFirstLetter(column.name)}
                         {isFormEditing && 
-                         requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column) && 
+                         requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column.name) && 
                          <span className="text-red-500 ml-1">*</span>}
                       </Label>
                       <div className="flex flex-col gap-2">
@@ -742,19 +744,19 @@ const FilteredTableView = ({ table }: FilteredTableViewProps) => {
                 }
                 
                 return (
-                  <div key={column} className="space-y-2">
+                  <div key={column.name} className="space-y-2">
                     <Label>
-                      {capitalizeFirstLetter(column)}
+                      {capitalizeFirstLetter(column.name)}
                       {isFormEditing && 
-                       requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column) && 
+                       requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column.name) && 
                        <span className="text-red-500 ml-1">*</span>}
                     </Label>
                     <TableFieldFormatter
-                      fieldName={column}
-                      value={formData[column]}
-                      onChange={(value) => handleInputChange(column, value)}
+                      fieldName={column.name}
+                      value={formData[column.name]}
+                      onChange={(value) => handleInputChange(column.name, value)}
                       isEditing={isFormEditing}
-                      isRequired={requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column)}
+                      isRequired={requiredFields[table.name.toLowerCase() as keyof typeof requiredFields]?.includes(column.name)}
                     />
                   </div>
                 );

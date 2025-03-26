@@ -11,7 +11,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { ensureTasksHaveCreatedAt, Task } from '@/lib/api';
+import { Task, fetchTasksFromRPC, updateTaskViaRPC, createTaskViaRPC } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface StudentData {
@@ -30,19 +30,10 @@ interface StudentData {
   [key: string]: any;
 }
 
-interface TaskData {
-  id: number;
-  student_id: number;
-  description: string;
-  due_date: string;
-  completed: boolean;
-  created_at: string;
-}
-
 const StudentDetails = () => {
   const { studentId } = useParams<{ studentId: string }>();
   const [student, setStudent] = useState<StudentData | null>(null);
-  const [tasks, setTasks] = useState<TaskData[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -75,26 +66,10 @@ const StudentDetails = () => {
     try {
       setTasksLoading(true);
       
-      // Create a custom RPC function or use a view if needed
-      // For now, let's query the tasks table directly
-      const { data, error } = await supabase
-        .from('student_tasks')
-        .select('*')
-        .eq('student_id', studentId);
-        
-      if (error) throw error;
+      // Use the RPC function instead of direct table access
+      const tasksData = await fetchTasksFromRPC(studentId);
       
-      // Ensure all tasks have a created_at field
-      const tasksWithCreatedAt = data?.map(task => ({
-        id: task.id,
-        student_id: task.student_id,
-        description: task.description,
-        due_date: task.due_date,
-        completed: task.completed || false,
-        created_at: task.created_at || new Date().toISOString()
-      })) || [];
-      
-      setTasks(tasksWithCreatedAt);
+      setTasks(tasksData);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast.error('Failed to load student tasks');
@@ -111,17 +86,17 @@ const StudentDetails = () => {
       setTasksLoading(true);
       setIsAddingTask(true);
       
-      const { error } = await supabase
-        .from('student_tasks')
-        .insert({
-          student_id: studentId,
-          description: newTaskDescription,
-          due_date: newTaskDueDate.toISOString(),
-          completed: false,
-          created_at: new Date().toISOString()
-        });
-        
-      if (error) throw error;
+      // Use RPC function instead of direct table access
+      const success = await createTaskViaRPC({
+        student_id: parseInt(studentId),
+        description: newTaskDescription,
+        due_date: newTaskDueDate.toISOString(),
+        completed: false
+      });
+      
+      if (!success) {
+        throw new Error('Failed to add task');
+      }
       
       setNewTaskDescription('');
       setNewTaskDueDate(undefined);
@@ -140,12 +115,12 @@ const StudentDetails = () => {
     try {
       setTasksLoading(true);
       
-      const { error } = await supabase
-        .from('student_tasks')
-        .update({ completed: !completed })
-        .eq('id', taskId);
-        
-      if (error) throw error;
+      // Use RPC function instead of direct table access
+      const success = await updateTaskViaRPC(taskId, !completed);
+      
+      if (!success) {
+        throw new Error('Failed to update task');
+      }
       
       fetchTasks();
       toast.success(completed ? 'Task marked as incomplete' : 'Task marked as complete');
