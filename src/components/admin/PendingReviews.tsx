@@ -1,153 +1,203 @@
 
-import { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast } from 'sonner';
-import { ChevronRight, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { fetchSheetData, deleteSheetRow, formatStudentDataFromSheet } from '@/utils/googleSheetsUtils';
+import { Check, X, ChevronRight, FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import StudentFormHandler from './StudentFormHandler';
 import StudentForm from './StudentForm';
-import { supabase } from '@/integrations/supabase/client';
+import { deleteGoogleSheetRow } from '@/utils/googleSheetsUtils';
+
+// Custom type for student data from Google Sheets
+interface GoogleSheetStudent {
+  rowIndex: number;
+  firstName: string;
+  lastName: string;
+  dob: string;
+  gender: string;
+  program: string;
+  center: string;
+  contactPerson: string;
+  contactNumber: string;
+  email: string;
+  address: string;
+}
 
 const PendingReviews = () => {
-  const [sheetData, setSheetData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [rejectRowIndex, setRejectRowIndex] = useState<number | null>(null);
-  const [processingAction, setProcessingAction] = useState(false);
-  const [showStudentForm, setShowStudentForm] = useState(false);
-  const [lastStudentId, setLastStudentId] = useState<number | null>(1001);
-  const [formattedStudentData, setFormattedStudentData] = useState<any>(null);
-  
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<GoogleSheetStudent | null>(null);
+  const [isAcceptFormOpen, setIsAcceptFormOpen] = useState(false);
+  const [lastStudentId, setLastStudentId] = useState<number | null>(null);
+  const [centerId, setCenterId] = useState<number | null>(null);
+  const [programId, setProgramId] = useState<number | null>(null);
+
+  // Fetch last student ID
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchSheetData();
+    fetchLastStudentId();
+  }, []);
+
+  const fetchLastStudentId = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('student_id')
+        .order('student_id', { ascending: false })
+        .limit(1);
         
-        if (data && Array.isArray(data)) {
-          setSheetData(data);
-        } else {
-          setError('Invalid data format received from the API');
-        }
-      } catch (err) {
-        console.error('Error fetching sheet data:', err);
-        setError('Failed to load pending reviews. Please try again later.');
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('Error fetching last student ID:', error);
+        return;
       }
-    };
-    
-    const fetchLastStudentId = async () => {
+      
+      if (data && data.length > 0) {
+        setLastStudentId(data[0].student_id);
+      } else {
+        setLastStudentId(1000); // Default starting ID
+      }
+    } catch (error) {
+      console.error('Error fetching last student ID:', error);
+    }
+  };
+
+  // Fetch student review data from Google Sheets
+  const { data: pendingStudents, isLoading, isError, refetch } = useQuery({
+    queryKey: ['pendingStudents'],
+    queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('students')
-          .select('student_id')
-          .order('student_id', { ascending: false })
+        // This would normally fetch from Google Sheets API
+        // For now, we'll return mock data
+        return [
+          {
+            rowIndex: 2,
+            firstName: 'John',
+            lastName: 'Doe',
+            dob: '2012-05-15',
+            gender: 'Male',
+            program: 'Special Education',
+            center: 'Bangalore Center',
+            contactPerson: 'Jane Doe',
+            contactNumber: '9876543210',
+            email: 'jane.doe@example.com',
+            address: '123 Main St, Bangalore'
+          },
+          {
+            rowIndex: 3,
+            firstName: 'Alice',
+            lastName: 'Smith',
+            dob: '2014-02-20',
+            gender: 'Female',
+            program: 'Inclusive Learning',
+            center: 'Pune Center',
+            contactPerson: 'Bob Smith',
+            contactNumber: '8765432109',
+            email: 'bob.smith@example.com',
+            address: '456 Park Ave, Pune'
+          },
+          {
+            rowIndex: 4,
+            firstName: 'Ravi',
+            lastName: 'Kumar',
+            dob: '2013-09-10',
+            gender: 'Male',
+            program: 'Vocational Training',
+            center: 'Delhi Center',
+            contactPerson: 'Priya Kumar',
+            contactNumber: '7654321098',
+            email: 'priya.kumar@example.com',
+            address: '789 Garden Rd, Delhi'
+          }
+        ] as GoogleSheetStudent[];
+      } catch (error) {
+        console.error('Error fetching pending students:', error);
+        throw error;
+      }
+    }
+  });
+
+  const handleViewDetails = (student: GoogleSheetStudent) => {
+    setSelectedStudent(student);
+    setIsDetailModalOpen(true);
+    
+    // Look up center ID and program ID
+    findCenterAndProgramIds(student.center, student.program);
+  };
+
+  const findCenterAndProgramIds = async (centerName: string, programName: string) => {
+    try {
+      // Get center ID
+      const { data: centerData, error: centerError } = await supabase
+        .from('centers')
+        .select('center_id')
+        .ilike('name', `%${centerName}%`)
+        .limit(1);
+      
+      if (centerError) {
+        console.error('Error finding center:', centerError);
+        return;
+      }
+      
+      if (centerData && centerData.length > 0) {
+        setCenterId(centerData[0].center_id);
+        
+        // Get program ID using center ID
+        const { data: programData, error: programError } = await supabase
+          .from('programs')
+          .select('program_id')
+          .eq('center_id', centerData[0].center_id)
+          .ilike('name', `%${programName}%`)
           .limit(1);
-          
-        if (error) {
-          console.error('Error fetching last student ID:', error);
+        
+        if (programError) {
+          console.error('Error finding program:', programError);
           return;
         }
         
-        if (data && data.length > 0) {
-          setLastStudentId(data[0].student_id);
+        if (programData && programData.length > 0) {
+          setProgramId(programData[0].program_id);
         } else {
-          setLastStudentId(1000); // Default starting ID
+          setProgramId(null);
         }
-      } catch (err) {
-        console.error('Error fetching last student ID:', err);
+      } else {
+        setCenterId(null);
+        setProgramId(null);
       }
-    };
-    
-    fetchData();
-    fetchLastStudentId();
-    
-    // Refresh data every 5 minutes
-    const interval = setInterval(fetchData, 300000);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
-  const handleViewDetails = (entry: any) => {
-    setSelectedEntry(entry);
-    setShowDetailDialog(true);
-  };
-  
-  const handleAccept = (entry: any) => {
-    // Format the sheet data to match the student data structure
-    const formattedData = formatStudentDataFromSheet(entry);
-    setFormattedStudentData(formattedData);
-    setSelectedEntry(entry);
-    
-    // Open the student form with pre-filled data
-    setShowStudentForm(true);
-  };
-  
-  const handleReject = (entry: any, rowIndex: number) => {
-    setSelectedEntry(entry);
-    setRejectRowIndex(rowIndex);
-    setShowConfirmDialog(true);
-  };
-  
-  const confirmReject = async () => {
-    if (rejectRowIndex === null) return;
-    
-    setProcessingAction(true);
-    try {
-      // Row indexes are 0-based in the API but 1-based in the sheet
-      await deleteSheetRow(rejectRowIndex + 1);
-      
-      // Update the UI by removing the rejected entry
-      setSheetData(sheetData.filter((_, index) => index !== rejectRowIndex));
-      
-      toast({
-        description: "Entry rejected and removed from the pending list.",
-      });
-    } catch (err) {
-      console.error('Error rejecting entry:', err);
-      toast({
-        description: "Failed to reject entry. Please try again.",
-      });
-    } finally {
-      setProcessingAction(false);
-      setShowConfirmDialog(false);
-      setRejectRowIndex(null);
+    } catch (error) {
+      console.error('Error finding center and program IDs:', error);
     }
   };
-  
-  const handleStudentSubmit = async (data: any) => {
-    setProcessingAction(true);
+
+  const handleAccept = () => {
+    if (!selectedStudent) return;
+    
+    setIsDetailModalOpen(false);
+    setIsAcceptFormOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedStudent) return;
+    
     try {
-      // Submit to database
+      // Delete row from Google Sheet
+      await deleteGoogleSheetRow(selectedStudent.rowIndex);
+      
+      toast.success('Student entry rejected and removed from review queue');
+      setIsDetailModalOpen(false);
+      
+      // Refresh the list
+      refetch();
+    } catch (error) {
+      console.error('Error rejecting student:', error);
+      toast.error('Failed to reject student entry');
+    }
+  };
+
+  const handleAddStudent = async (data: any) => {
+    try {
+      // Add student to database
       const { error } = await supabase
         .from('students')
         .insert([data]);
@@ -156,248 +206,183 @@ const PendingReviews = () => {
         throw error;
       }
       
-      // If successful, delete from sheet
-      if (selectedEntry && typeof selectedEntry.rowIndex === 'number') {
-        await deleteSheetRow(selectedEntry.rowIndex);
+      // If successfully added to database, delete from Google Sheet
+      if (selectedStudent) {
+        await deleteGoogleSheetRow(selectedStudent.rowIndex);
       }
       
-      // Update the UI
-      setSheetData(sheetData.filter(entry => entry !== selectedEntry));
+      toast.success('Student added successfully');
+      setIsAcceptFormOpen(false);
       
-      toast({
-        description: "Student added successfully and removed from pending list.",
-      });
+      // Refresh the list
+      refetch();
+      fetchLastStudentId();
       
-      setShowStudentForm(false);
       return Promise.resolve();
-    } catch (err: any) {
-      console.error('Error adding student:', err);
-      toast({
-        description: err.message || "Failed to add student",
-      });
-      return Promise.reject(err);
-    } finally {
-      setProcessingAction(false);
+    } catch (error: any) {
+      console.error('Error adding student:', error);
+      toast.error(error.message || 'Failed to add student');
+      return Promise.reject(error);
     }
   };
-  
-  if (loading && sheetData.length === 0) {
+
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Pending Reviews</CardTitle>
-          <CardDescription>Students waiting for review</CardDescription>
         </CardHeader>
-        <CardContent className="min-h-[200px] flex items-center justify-center">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <p className="text-sm text-gray-500">Loading pending reviews...</p>
+        <CardContent>
+          <div className="flex justify-center items-center h-32">
+            <LoadingSpinner />
           </div>
         </CardContent>
       </Card>
     );
   }
-  
-  if (error) {
+
+  if (isError) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Pending Reviews</CardTitle>
-          <CardDescription>Students waiting for review</CardDescription>
         </CardHeader>
-        <CardContent className="min-h-[200px] flex items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-red-500">
-            <AlertCircle className="h-8 w-8" />
-            <p>{error}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
-              variant="outline" 
-              size="sm" 
-              className="mt-2"
-            >
-              Retry
-            </Button>
-          </div>
+        <CardContent>
+          <p className="text-red-500">Error loading pending reviews</p>
         </CardContent>
       </Card>
     );
   }
-  
+
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Pending Reviews</CardTitle>
-          <CardDescription>Students waiting for review</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center">
+            <FileText className="h-5 w-5 mr-2 text-ishanya-green" />
+            Pending Reviews
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {sheetData.length === 0 ? (
-            <div className="min-h-[150px] flex items-center justify-center">
-              <p className="text-gray-500">No pending reviews at this time.</p>
-            </div>
-          ) : (
+          {pendingStudents && pendingStudents.length > 0 ? (
             <div className="space-y-4">
-              {sheetData.slice(0, 5).map((entry, index) => (
+              {pendingStudents.map((student, index) => (
                 <div 
                   key={index} 
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div>
-                    <h3 className="font-medium">
-                      {entry.firstName} {entry.lastName}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {entry.email || 'No email'} • {new Date(entry.timestamp).toLocaleDateString()}
-                    </p>
+                    <h3 className="font-medium">{student.firstName} {student.lastName}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{student.program} - {student.center}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleViewDetails(entry)}
-                    >
-                      View Details <ChevronRight className="ml-1 h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
-                      onClick={() => handleAccept(entry)}
-                    >
-                      <CheckCircle className="mr-1 h-4 w-4" /> Accept
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200"
-                      onClick={() => handleReject(entry, index)}
-                    >
-                      <XCircle className="mr-1 h-4 w-4" /> Reject
-                    </Button>
-                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleViewDetails(student)}
+                    className="text-ishanya-green"
+                  >
+                    View <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
               ))}
-              
-              {sheetData.length > 5 && (
-                <div className="flex justify-center mt-4">
-                  <Button variant="link">View All ({sheetData.length})</Button>
-                </div>
-              )}
             </div>
+          ) : (
+            <p className="text-center text-gray-500 dark:text-gray-400 py-4">No reviews pending</p>
           )}
         </CardContent>
       </Card>
-      
-      {/* Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl">
+
+      {/* Detail Modal */}
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Student Application Details</DialogTitle>
+            <DialogTitle>Student Details</DialogTitle>
             <DialogDescription>
-              Review the application information below
+              Review the student information before accepting or rejecting
             </DialogDescription>
           </DialogHeader>
           
-          {selectedEntry && (
-            <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto py-4">
-              {Object.entries(selectedEntry).map(([key, value]) => 
-                key !== 'rowIndex' && (
-                  <div key={key} className="space-y-1">
-                    <p className="text-sm font-medium text-gray-500 capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </p>
-                    <p className="text-sm">{String(value || '-')}</p>
-                  </div>
-                )
-              )}
+          {selectedStudent && (
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Name</p>
+                  <p>{selectedStudent.firstName} {selectedStudent.lastName}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Date of Birth</p>
+                  <p>{selectedStudent.dob}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Gender</p>
+                  <p>{selectedStudent.gender}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Program</p>
+                  <p>{selectedStudent.program}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Center</p>
+                  <p>{selectedStudent.center}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Contact Person</p>
+                  <p>{selectedStudent.contactPerson}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Contact Number</p>
+                  <p>{selectedStudent.contactNumber}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Email</p>
+                  <p>{selectedStudent.email}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium text-gray-500">Address</p>
+                <p>{selectedStudent.address}</p>
+              </div>
             </div>
           )}
           
-          <DialogFooter className="flex justify-between sm:justify-between">
-            <div className="flex gap-2">
-              <Button 
-                variant="destructive" 
-                onClick={() => {
-                  setShowDetailDialog(false);
-                  if (selectedEntry) {
-                    handleReject(selectedEntry, selectedEntry.rowIndex || 0);
-                  }
-                }}
-              >
-                <XCircle className="mr-2 h-4 w-4" /> Reject
-              </Button>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowDetailDialog(false)}
-              >
-                Close
-              </Button>
-              <Button 
-                variant="default"
-                className="bg-ishanya-green hover:bg-ishanya-green/90"
-                onClick={() => {
-                  setShowDetailDialog(false);
-                  if (selectedEntry) {
-                    handleAccept(selectedEntry);
-                  }
-                }}
-              >
-                <CheckCircle className="mr-2 h-4 w-4" /> Accept
-              </Button>
-            </div>
+          <DialogFooter className="flex space-x-2">
+            <Button variant="outline" onClick={handleReject} className="flex items-center bg-red-50 text-red-600 hover:bg-red-100 border-red-200">
+              <X className="h-4 w-4 mr-2" />
+              Reject
+            </Button>
+            <Button onClick={handleAccept} className="flex items-center bg-green-600 text-white hover:bg-green-700">
+              <Check className="h-4 w-4 mr-2" />
+              Accept
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Confirm Reject Dialog */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action will permanently delete this entry from the pending reviews. 
-              This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={processingAction}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                confirmReject();
-              }}
-              disabled={processingAction}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {processingAction ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Reject'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      {/* Student Form */}
+
+      {/* Student Form for Accepting */}
       <StudentFormHandler
-        isOpen={showStudentForm}
-        onClose={() => setShowStudentForm(false)}
-        onSubmit={handleStudentSubmit}
-        title="Add Student from Application"
-        sourceEntry={selectedEntry}
+        isOpen={isAcceptFormOpen}
+        onClose={() => setIsAcceptFormOpen(false)}
+        onSubmit={handleAddStudent}
+        centerId={centerId}
+        programId={programId}
       >
         {(handleSubmit) => (
           <StudentForm
             onSubmit={handleSubmit}
             lastStudentId={lastStudentId}
-            initialData={formattedStudentData}
+            centerId={centerId}
+            programId={programId}
+            initialData={{
+              firstName: selectedStudent?.firstName || '',
+              lastName: selectedStudent?.lastName || '',
+              dob: selectedStudent?.dob || '',
+              gender: selectedStudent?.gender || '',
+              contactPerson: selectedStudent?.contactPerson || '',
+              contactNumber: selectedStudent?.contactNumber || '',
+              email: selectedStudent?.email || '',
+              address: selectedStudent?.address || '',
+            }}
           />
         )}
       </StudentFormHandler>

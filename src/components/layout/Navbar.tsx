@@ -69,7 +69,7 @@ const Navbar = () => {
                 <img 
                   src="/lovable-uploads/17953c8a-6715-4e58-af68-a3918c44fd33.png" 
                   alt="Ishanya Foundation" 
-                  className="h-10 w-auto" 
+                  className="h-12 w-auto" // Increased from h-10 to h-12
                 />
               </Link>
             </div>

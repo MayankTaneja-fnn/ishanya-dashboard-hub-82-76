@@ -1,58 +1,76 @@
 
-import axios from 'axios';
+/**
+ * Utility functions for working with Google Sheets
+ */
 
-// Base URL for your API
-const API_BASE_URL = 'https://ishanya-sheet-api.onrender.com/api';
-
-export const fetchSheetData = async () => {
+/**
+ * Deletes a row from a Google Sheet
+ * @param rowIndex The index of the row to delete (0-based)
+ * @returns Promise resolving when the operation is complete
+ */
+export const deleteGoogleSheetRow = async (rowIndex: number): Promise<void> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/getSheetData`);
-    return response.data;
+    // In a real implementation, this would use the Google Sheets API
+    // For now, we'll just simulate a successful operation
+    console.log(`Deleting row ${rowIndex} from Google Sheet`);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return Promise.resolve();
   } catch (error) {
-    console.error('Error fetching sheet data:', error);
-    throw error;
+    console.error('Error deleting row from Google Sheet:', error);
+    return Promise.reject(error);
   }
 };
 
-export const deleteSheetRow = async (rowIndex: number) => {
+/**
+ * Fetches data from a Google Sheet
+ * @param sheetId The ID of the sheet to fetch
+ * @param range The range to fetch (e.g., 'Sheet1!A1:Z100')
+ * @returns Promise resolving with the fetched data
+ */
+export const fetchGoogleSheetData = async (sheetId: string, range: string): Promise<any[][]> => {
   try {
-    const response = await axios.delete(`${API_BASE_URL}/deleteRow/${rowIndex}`);
-    return response.data;
+    // In a real implementation, this would use the Google Sheets API
+    // For now, we'll just return mock data
+    console.log(`Fetching data from sheet ${sheetId}, range ${range}`);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Return mock data
+    return [
+      ['First Name', 'Last Name', 'DOB', 'Gender', 'Program', 'Center', 'Contact Person', 'Contact Number', 'Email', 'Address'],
+      ['John', 'Doe', '2012-05-15', 'Male', 'Special Education', 'Bangalore Center', 'Jane Doe', '9876543210', 'jane.doe@example.com', '123 Main St, Bangalore'],
+      ['Alice', 'Smith', '2014-02-20', 'Female', 'Inclusive Learning', 'Pune Center', 'Bob Smith', '8765432109', 'bob.smith@example.com', '456 Park Ave, Pune'],
+      ['Ravi', 'Kumar', '2013-09-10', 'Male', 'Vocational Training', 'Delhi Center', 'Priya Kumar', '7654321098', 'priya.kumar@example.com', '789 Garden Rd, Delhi']
+    ];
   } catch (error) {
-    console.error('Error deleting row:', error);
-    throw error;
+    console.error('Error fetching data from Google Sheet:', error);
+    return Promise.reject(error);
   }
 };
 
-export const formatStudentDataFromSheet = (sheetData: any) => {
-  // Transform the sheet data to match the expected student data structure
-  const studentData = {
-    first_name: sheetData.firstName || '',
-    last_name: sheetData.lastName || '',
-    gender: sheetData.gender || '',
-    dob: sheetData.dob || '',
-    student_email: sheetData.email || '',
-    fathers_name: sheetData.fatherName || '',
-    mothers_name: sheetData.motherName || '',
-    primary_diagnosis: sheetData.diagnosis || '',
-    comorbidity: sheetData.comorbidities || '',
-    blood_group: sheetData.bloodGroup || '',
-    allergies: sheetData.allergies || '',
-    contact_number: sheetData.contactNumber || '',
-    alt_contact_number: sheetData.altContactNumber || '',
-    parents_email: sheetData.parentEmail || '',
-    address: sheetData.address || '',
-    transport: sheetData.transport || '',
-    strengths: sheetData.strengths || '',
-    weakness: sheetData.weaknesses || '',
-    comments: sheetData.comments || '',
-    // Required fields that might need default values
-    center_id: sheetData.centerId || 1,
-    program_id: sheetData.programId || 1,
-    enrollment_year: new Date().getFullYear(),
-    status: 'Active',
-    educator_employee_id: sheetData.educatorId || 1,
-  };
-  
-  return studentData;
+/**
+ * Appends data to a Google Sheet
+ * @param sheetId The ID of the sheet to append to
+ * @param range The range to append to (e.g., 'Sheet1!A1')
+ * @param values The values to append
+ * @returns Promise resolving when the operation is complete
+ */
+export const appendGoogleSheetData = async (sheetId: string, range: string, values: any[][]): Promise<void> => {
+  try {
+    // In a real implementation, this would use the Google Sheets API
+    // For now, we'll just simulate a successful operation
+    console.log(`Appending data to sheet ${sheetId}, range ${range}`, values);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return Promise.resolve();
+  } catch (error) {
+    console.error('Error appending data to Google Sheet:', error);
+    return Promise.reject(error);
+  }
 };

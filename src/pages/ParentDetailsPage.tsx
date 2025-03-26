@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -39,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { convertStudentDataTypes, convertEducatorDataTypes } from '@/utils/typeConverters';
 
 type StudentData = {
   student_id: string;
@@ -156,60 +156,73 @@ const ParentDetailsPage = () => {
         // Fetch student details
         const { data: studentData, error: studentError } = await supabase
           .from('students')
-          .select('*, programs(*)')
-          .eq('student_id', firstStudentId)
+          .select(`
+            *,
+            programs (
+              name
+            )
+          `)
+          .eq('parent_user_id', user?.id)
           .single();
           
         if (studentError) {
-          console.error('Error fetching student data:', studentError);
-          setError("Failed to fetch student data");
+          console.error('Error fetching student details:', studentError);
+          setError("Failed to load student details");
           setLoading(false);
           return;
         }
         
-        setStudent(studentData);
-        
-        // Fetch educator
-        if (studentData.educator_employee_id) {
-          const { data: educatorData, error: educatorError } = await supabase
-            .from('educators')
-            .select('*')
-            .eq('employee_id', studentData.educator_employee_id)
-            .single();
+        if (studentData) {
+          // Convert the student data types
+          const convertedStudentData = convertStudentDataTypes(studentData);
+          setStudent(convertedStudentData);
+          
+          // Fetch educator details
+          if (studentData.educator_employee_id) {
+            const { data: educatorData, error: educatorError } = await supabase
+              .from('educators')
+              .select('*')
+              .eq('employee_id', studentData.educator_employee_id)
+              .single();
             
-          if (!educatorError && educatorData) {
-            setEducator(educatorData);
+            if (educatorError) {
+              console.error('Error fetching educator details:', educatorError);
+            } else if (educatorData) {
+              // Convert the educator data types
+              const convertedEducatorData = convertEducatorDataTypes(educatorData);
+              setEducator(convertedEducatorData);
+            }
           }
-        }
-        
-        // Fetch program
-        if (studentData.program_id) {
-          const { data: programData, error: programError } = await supabase
-            .from('programs')
-            .select('*')
-            .eq('program_id', studentData.program_id)
-            .single();
-            
-          if (!programError && programData) {
-            setProgram(programData);
-            
-            // Fetch center
-            if (programData.center_id) {
-              const { data: centerData, error: centerError } = await supabase
-                .from('centers')
-                .select('*')
-                .eq('center_id', programData.center_id)
-                .single();
-                
-              if (!centerError && centerData) {
-                setCenter(centerData);
+          
+          // Fetch program
+          if (studentData.program_id) {
+            const { data: programData, error: programError } = await supabase
+              .from('programs')
+              .select('*')
+              .eq('program_id', studentData.program_id)
+              .single();
+              
+            if (!programError && programData) {
+              setProgram(programData);
+              
+              // Fetch center
+              if (programData.center_id) {
+                const { data: centerData, error: centerError } = await supabase
+                  .from('centers')
+                  .select('*')
+                  .eq('center_id', programData.center_id)
+                  .single();
+                  
+                if (!centerError && centerData) {
+                  setCenter(centerData);
+                }
               }
             }
           }
+          
+          // Fetch reports
+          fetchReports(studentData.student_id);
         }
-        
-        // Fetch reports
-        fetchReports(firstStudentId);
         
         setLoading(false);
       } catch (error) {
@@ -340,52 +353,58 @@ const ParentDetailsPage = () => {
         return;
       }
       
-      setStudent(studentData);
-      
-      // Fetch educator
-      if (studentData.educator_employee_id) {
-        const { data: educatorData, error: educatorError } = await supabase
-          .from('educators')
-          .select('*')
-          .eq('employee_id', studentData.educator_employee_id)
-          .single();
-          
-        if (!educatorError && educatorData) {
-          setEducator(educatorData);
+      if (studentData) {
+        // Convert the student data types
+        const convertedStudentData = convertStudentDataTypes(studentData);
+        setStudent(convertedStudentData);
+        
+        // Fetch educator
+        if (studentData.educator_employee_id) {
+          const { data: educatorData, error: educatorError } = await supabase
+            .from('educators')
+            .select('*')
+            .eq('employee_id', studentData.educator_employee_id)
+            .single();
+            
+          if (!educatorError && educatorData) {
+            // Convert the educator data types
+            const convertedEducatorData = convertEducatorDataTypes(educatorData);
+            setEducator(convertedEducatorData);
+          }
         }
-      }
-      
-      // Fetch program
-      if (studentData.program_id) {
-        const { data: programData, error: programError } = await supabase
-          .from('programs')
-          .select('*')
-          .eq('program_id', studentData.program_id)
-          .single();
-          
-        if (!programError && programData) {
-          setProgram(programData);
-          
-          // Fetch center
-          if (programData.center_id) {
-            const { data: centerData, error: centerError } = await supabase
-              .from('centers')
-              .select('*')
-              .eq('center_id', programData.center_id)
-              .single();
-              
-            if (!centerError && centerData) {
-              setCenter(centerData);
+        
+        // Fetch program
+        if (studentData.program_id) {
+          const { data: programData, error: programError } = await supabase
+            .from('programs')
+            .select('*')
+            .eq('program_id', studentData.program_id)
+            .single();
+            
+          if (!programError && programData) {
+            setProgram(programData);
+            
+            // Fetch center
+            if (programData.center_id) {
+              const { data: centerData, error: centerError } = await supabase
+                .from('centers')
+                .select('*')
+                .eq('center_id', programData.center_id)
+                .single();
+                
+              if (!centerError && centerData) {
+                setCenter(centerData);
+              }
             }
           }
         }
+        
+        // Fetch reports
+        fetchReports(studentId);
+        
+        setStudentId(studentId);
+        setLoading(false);
       }
-      
-      // Fetch reports
-      fetchReports(studentId);
-      
-      setStudentId(studentId);
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -396,6 +415,18 @@ const ParentDetailsPage = () => {
       setLoading(false);
     }
   };
+  
+  useEffect(() => {
+    if (studentData && !student) {
+      const convertedStudentData = convertStudentDataTypes(studentData);
+      setStudent(convertedStudentData);
+    }
+    
+    if (educatorData && !educator) {
+      const convertedEducatorData = convertEducatorDataTypes(educatorData);
+      setEducator(convertedEducatorData);
+    }
+  }, [studentData, educatorData, student, educator]);
   
   if (loading) {
     return (

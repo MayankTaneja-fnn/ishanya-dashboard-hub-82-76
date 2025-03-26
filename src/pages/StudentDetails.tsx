@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import axios from 'axios';
+import { convertTaskDataTypes } from '@/utils/typeConverters';
 
 type Student = {
   student_id: number;
@@ -84,10 +85,8 @@ const StudentDetails = () => {
       
       setLoading(true);
       try {
-        // Convert studentId to number for database queries
         const studentIdNum = parseInt(studentId, 10);
         
-        // Fetch student info
         const { data: studentData, error: studentError } = await supabase
           .from('students')
           .select('student_id, first_name, last_name, gender, program_id, educator_employee_id, center_id')
@@ -97,7 +96,6 @@ const StudentDetails = () => {
         if (studentError) throw studentError;
         setStudent(studentData);
 
-        // Fetch performance records
         const { data: perfData, error: perfError } = await supabase
           .from('performance_records')
           .select('*')
@@ -106,7 +104,6 @@ const StudentDetails = () => {
         if (perfError) throw perfError;
         setPerformanceRecords(perfData || []);
 
-        // Fetch general reports
         const { data: reportData, error: reportError } = await supabase
           .from('general_reporting')
           .select('*')
@@ -115,7 +112,6 @@ const StudentDetails = () => {
         if (reportError) throw reportError;
         setGeneralReports(reportData || []);
 
-        // Fetch tasks
         const { data: taskData, error: taskError } = await supabase
           .from('goals_tasks')
           .select('*')
@@ -124,7 +120,6 @@ const StudentDetails = () => {
         if (taskError) throw taskError;
         setTasks(taskData || []);
 
-        // Fetch attendance
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('student_attendance')
           .select('attendance')
@@ -132,7 +127,6 @@ const StudentDetails = () => {
 
         if (attendanceError) throw attendanceError;
         
-        // Calculate attendance statistics
         const present = attendanceData?.filter(a => a.attendance === true).length || 0;
         const absent = attendanceData?.filter(a => a.attendance === false).length || 0;
         setAttendance({ present, absent });
@@ -148,10 +142,34 @@ const StudentDetails = () => {
     fetchStudentData();
   }, [studentId]);
 
+  const fetchTasks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('student_id', studentId);
+        
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+      }
+      
+      if (data) {
+        const convertedTasks = data.map(task => convertTaskDataTypes(task));
+        setTasks(convertedTasks);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [studentId]);
+
   const getQuarterlyPerformance = (quarter: string) => {
     if (!student) return null;
     
-    // Filter for the specific quarter and current year
     const yearPrefix = currentYear.toString();
     const fullQuarter = quarter.includes(yearPrefix) ? quarter : quarter.replace(/\d{4}/g, yearPrefix);
     
@@ -166,7 +184,6 @@ const StudentDetails = () => {
   const getQuarterlyReport = (quarter: string) => {
     if (!student) return null;
     
-    // Filter for the specific quarter and current year
     const yearPrefix = currentYear.toString();
     const fullQuarter = quarter.includes(yearPrefix) ? quarter : quarter.replace(/\d{4}/g, yearPrefix);
     
@@ -195,10 +212,9 @@ const StudentDetails = () => {
           educator_employee_id: student.educator_employee_id,
           quarter: fullQuarter
         },
-        responseType: 'blob' // Important for file download
+        responseType: 'blob'
       });
       
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -206,7 +222,6 @@ const StudentDetails = () => {
       document.body.appendChild(link);
       link.click();
       
-      // Clean up
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
       
@@ -281,7 +296,6 @@ const StudentDetails = () => {
       onBack={() => window.history.back()}
     >
       <div className="space-y-6">
-        {/* Student Info Card */}
         <Card>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -311,7 +325,6 @@ const StudentDetails = () => {
           </CardContent>
         </Card>
 
-        {/* Year Navigation */}
         <div className="flex items-center justify-center gap-4 mb-4">
           <Button
             variant="outline"
@@ -332,7 +345,6 @@ const StudentDetails = () => {
           </Button>
         </div>
 
-        {/* Quarterly Performance Cards */}
         <div className="grid grid-cols-1 gap-4">
           {updatedQuarters.map((quarter) => {
             const performance = getQuarterlyPerformance(quarter);
@@ -354,21 +366,17 @@ const StudentDetails = () => {
                 {isExpanded && (
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Performance Records */}
                       <div>
                         <h3 className="font-semibold mb-3">Performance Records</h3>
                         {performance ? (
                           <div className="space-y-3">
                             <p><strong>Area of Development:</strong> {performance.area_of_development}</p>
                             
-                            {/* Dynamic fields from performance record */}
                             {Object.entries(performance).map(([key, value]) => {
-                              // Skip standard fields and null values
                               if (['id', 'student_id', 'program_id', 'educator_employee_id', 'quarter', 'area_of_development'].includes(key) || value === null) {
                                 return null;
                               }
                               
-                              // Format key for display (e.g., "1_score" becomes "Score 1")
                               const displayKey = key.includes('_') 
                                 ? `${key.split('_')[1].charAt(0).toUpperCase() + key.split('_')[1].slice(1)} ${key.split('_')[0]}` 
                                 : key.charAt(0).toUpperCase() + key.slice(1);
@@ -383,7 +391,6 @@ const StudentDetails = () => {
                         )}
                       </div>
                       
-                      {/* General Report */}
                       <div>
                         <h3 className="font-semibold mb-3">General Report</h3>
                         {report ? (
@@ -421,7 +428,6 @@ const StudentDetails = () => {
           })}
         </div>
 
-        {/* Tasks and Goals */}
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Tasks and Goals</h2>
           {tasks.length > 0 ? (

@@ -15,7 +15,6 @@ const LandingPage = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // For debugging - log current language
   useEffect(() => {
     console.log("Current language:", language);
   }, [language]);
@@ -29,7 +28,6 @@ const LandingPage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Add smooth scrolling behavior
   useEffect(() => {
     const handleAnchorClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -40,7 +38,6 @@ const LandingPage = () => {
         const targetElement = document.querySelector(anchor.hash);
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth' });
-          // Close mobile menu if open
           setIsMobileMenuOpen(false);
         }
       }
@@ -54,7 +51,6 @@ const LandingPage = () => {
     navigate('/login');
   };
 
-  // Animation variants
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
@@ -95,7 +91,7 @@ const LandingPage = () => {
                   <img 
                     src="/favicon.svg" 
                     alt="Ishanya Logo" 
-                    className="h-14 w-auto" 
+                    className="h-20 w-auto"
                   />
                 </a>
               </div>
@@ -171,7 +167,6 @@ const LandingPage = () => {
                 {t('login.button') || 'Login'}
               </Button>
               
-              {/* Mobile menu button */}
               <button 
                 className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -190,7 +185,6 @@ const LandingPage = () => {
             </div>
           </div>
           
-          {/* Mobile menu */}
           <div className={`md:hidden ${isMobileMenuOpen ? 'block' : 'hidden'}`}>
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
               <a href="#home" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -349,7 +343,6 @@ const LandingPage = () => {
                 </div>
               </motion.div>
               
-              {/* Add Indian themed image to About Us section */}
               <motion.div
                 className="flex justify-center items-center"
                 initial="hidden"
@@ -358,9 +351,9 @@ const LandingPage = () => {
                 variants={fadeIn}
               >
                 <img 
-                  src="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80&w=2071&auto=format&fit=crop"
-                  alt="Indian students in a classroom setting" 
-                  className="rounded-2xl shadow-xl object-cover h-80 w-full" 
+                  src="/lovable-uploads/4ce1be7f-1512-4ad9-898d-8e265d612982.png"
+                  alt="Inclusive community graphic showing diverse individuals with disabilities" 
+                  className="rounded-2xl shadow-xl object-cover w-full max-h-[400px]" 
                 />
               </motion.div>
             </div>
@@ -566,199 +559,65 @@ const LandingPage = () => {
             variants={fadeInUp}
           >
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-4xl">
-              {t('common.contact') || 'Contact Us'}
+              {t('common.contact') || 'Contact'}
             </h2>
             <p className="mt-4 text-xl text-gray-600 dark:text-gray-300">
-              {t('landing.contact_subtitle') || 'Get in touch with our team'}
+              {t('landing.contact_description') || 'Contact us for more information or to schedule a consultation.'}
             </p>
             <div className="mt-4 w-24 h-1 bg-ishanya-green mx-auto rounded-full"></div>
           </motion.div>
           <motion.div 
-            className="mt-16 bg-white dark:bg-gray-800 shadow-2xl rounded-2xl overflow-hidden"
+            className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+            variants={staggerChildren}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            variants={fadeInUp}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2">
-              <div className="p-8 md:p-12 flex flex-col items-center">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">{t('landing.reach_out') || 'Reach Out to Us'}</h3>
-                <div className="space-y-6 w-full max-w-md">
-                  <div className="flex flex-col items-center">
-                    <div className="flex-shrink-0 bg-ishanya-green/10 p-3 rounded-full mb-3">
-                      <MapPin className="h-6 w-6 text-ishanya-green" />
-                    </div>
-                    <div className="text-center">
-                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">{t('landing.address') || 'Address'}</h4>
-                      <p className="mt-1 text-gray-600 dark:text-gray-300">769, 7th Main Rd, KSRTC Layout, 2nd Phase, JP Nagar, Bengaluru, Karnataka 560078</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="flex-shrink-0 bg-ishanya-green/10 p-3 rounded-full mb-3">
-                      <Mail className="h-6 w-6 text-ishanya-green" />
-                    </div>
-                    <div className="text-center">
-                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">{t('landing.email') || 'Email'}</h4>
-                      <p className="mt-1 text-gray-600 dark:text-gray-300">info@ishanyafoundation.org</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="flex-shrink-0 bg-ishanya-green/10 p-3 rounded-full mb-3">
-                      <Phone className="h-6 w-6 text-ishanya-green" />
-                    </div>
-                    <div className="text-center">
-                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">{t('landing.phone') || 'Phone'}</h4>
-                      <p className="mt-1 text-gray-600 dark:text-gray-300">+91 73496 76668</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-10 text-center">
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('landing.follow_us') || 'Follow Us'}</h4>
-                  <div className="flex justify-center space-x-6">
-                    <a 
-                      href="https://www.facebook.com/ishanyaindia" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors duration-300"
-                    >
-                      <Facebook size={24} />
-                    </a>
-                    <a 
-                      href="https://x.com/ishanyaindia" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-gray-100 dark:bg-gray-800/30 p-3 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800/50 transition-colors duration-300"
-                    >
-                      <Twitter size={24} />
-                    </a>
-                    <a 
-                      href="https://www.instagram.com/ishanyaindia/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-pink-100 dark:bg-pink-900/30 p-3 rounded-full text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/50 transition-colors duration-300"
-                    >
-                      <Instagram size={24} />
-                    </a>
-                    <a 
-                      href="https://www.linkedin.com/company/ishanyaindia/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors duration-300"
-                    >
-                      <Linkedin size={24} />
-                    </a>
-                    <a 
-                      href="https://www.youtube.com/channel/UC1bQFruy88Y8DrgXt4oq3og" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors duration-300"
-                    >
-                      <Youtube size={24} />
-                    </a>
-                  </div>
-                </div>
-              </div>
-              <div className="h-96 md:h-auto">
-                <iframe
-                  title="Ishanya Foundation Location"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.8291880953213!2d77.57743631482177!3d12.920053790887454!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae15081cb9f08d%3A0xe5a7a16a9cb93b9a!2s769%2C%207th%20Main%20Rd%2C%20KSRTC%20Layout%2C%20J.%20P.%20Nagar%20Phase%2C%20J.%20P.%20Nagar%2C%20Bengaluru%2C%20Karnataka%20560078!5e0!3m2!1sen!2sin!4v1651234567890!5m2!1sen!2sin"
-                  className="w-full h-full border-0"
-                  allowFullScreen={true}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                ></iframe>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-ishanya-green to-ishanya-green/90 dark:from-ishanya-green/90 dark:to-ishanya-green/80 py-16 relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-20 -mr-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div 
-            className="text-center"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeInUp}
-          >
-            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              Ready to get started?
-            </h2>
-            <p className="mt-4 text-xl text-white/90 max-w-2xl mx-auto">
-              Join us in our mission to create a more inclusive society.
-            </p>
-            <motion.div 
-              className="mt-10"
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.05 }}
-            >
-              <Button 
-                onClick={goToLogin}
-                className="bg-white text-ishanya-green hover:bg-gray-100 px-6 py-2 text-lg font-medium rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
-                size="lg"
+            {[
+              {
+                title: "Address",
+                description: "123 Main St, Anytown, USA",
+                icon: "https://img.icons8.com/fluency/96/000000/map-pin.png"
+              },
+              {
+                title: "Phone",
+                description: "+1 (123) 456-7890",
+                icon: "https://img.icons8.com/fluency/96/000000/phone.png"
+              },
+              {
+                title: "Email",
+                description: "info@ishanya.com",
+                icon: "https://img.icons8.com/fluency/96/000000/mail.png"
+              }
+            ].map((contact, index) => (
+              <motion.div 
+                key={index}
+                variants={fadeInUp}
+                whileHover={{ y: -10, transition: { duration: 0.3 } }}
               >
-                Login to Portal
-              </Button>
-            </motion.div>
+                <Card 
+                  className={`shadow-lg hover:shadow-2xl transition-all duration-500 h-full overflow-hidden border-none bg-gradient-to-br ${index % 2 === 0 ? 'from-ishanya-green/5 to-white' : 'from-ishanya-yellow/5 to-white'} dark:from-gray-700 dark:to-gray-800 rounded-2xl`}
+                  onMouseEnter={() => setIsHovering(contact.title)}
+                  onMouseLeave={() => setIsHovering(null)}
+                >
+                  <CardContent className="p-8 flex flex-col items-center h-full">
+                    <div className="w-20 h-20 flex items-center justify-center mb-6 bg-white dark:bg-gray-700 rounded-full shadow-md">
+                      <img 
+                        src={contact.icon} 
+                        alt={contact.title} 
+                        className={`w-12 h-12 object-contain transition-transform duration-300 ${isHovering === contact.title ? 'scale-110' : ''}`}
+                      />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{contact.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-center flex-grow">{contact.description}</p>
+                    <div className={`w-12 h-1 mt-6 rounded-full ${index % 2 === 0 ? 'bg-ishanya-green' : 'bg-ishanya-yellow'}`}></div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="flex flex-col items-center md:items-start">
-              <div className="flex items-center">
-                <img 
-                  src="/favicon.svg" 
-                  alt="Ishanya Logo" 
-                  className="h-16 w-auto"
-                />
-              </div>
-              <p className="mt-4 text-gray-300 text-center md:text-left">
-                {t('landing.foundation_tagline') || 'Creating a more inclusive society for individuals with special needs.'}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-6 border-b border-gray-700 pb-2 text-center md:text-left">{t('landing.quick_links') || 'Quick Links'}</h3>
-              <ul className="space-y-3 flex flex-col items-center md:items-start">
-                {[
-                  { label: t('common.home') || 'Home', href: "#home" },
-                  { label: t('common.about') || 'About Us', href: "#about" },
-                  { label: t('common.vision_mission') || 'Vision & Mission', href: "#mission" },
-                  { label: t('common.services') || 'Services', href: "#services" },
-                  { label: t('common.contact') || 'Contact', href: "#contact" }
-                ].map((link, index) => (
-                  <li key={index}>
-                    <a 
-                      href={link.href} 
-                      className="text-gray-300 hover:text-white transition-colors duration-300 flex items-center"
-                    >
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center">
-            <p className="text-gray-400">&copy; 2023-{new Date().getFullYear()} Ishanya Portal. All rights reserved.</p>
-            <div className="mt-4 sm:mt-0 flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">{t('landing.privacy_policy') || 'Privacy Policy'}</a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">{t('landing.terms') || 'Terms of Service'}</a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
