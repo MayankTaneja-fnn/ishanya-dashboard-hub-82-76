@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Layout } from '@/components/layout/Layout';
+import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,20 +11,27 @@ import { CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { ensureTasksHaveCreatedAt } from '@/lib/api';
+import { ensureTasksHaveCreatedAt, Task } from '@/lib/api';
 
-interface Task {
-  id: number;
+interface StudentData {
+  id: string;
   student_id: number;
-  description: string;
-  due_date: string;
-  completed: boolean;
-  created_at: string;
+  first_name: string;
+  last_name: string;
+  gender: string;
+  dob: string;
+  enrollment_year: number;
+  status: string;
+  student_email: string;
+  program_id: number;
+  contact_number: string;
+  center_id: number;
+  [key: string]: any;
 }
 
 const StudentDetails = () => {
   const { studentId } = useParams<{ studentId: string }>();
-  const [student, setStudent] = useState<any>(null);
+  const [student, setStudent] = useState<StudentData | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
@@ -51,15 +59,29 @@ const StudentDetails = () => {
   };
 
   const fetchTasks = async () => {
-    const { data: tasksData, error: tasksError } = await supabase
-      .from('student_tasks')  // Use the correct table name here
-      .select('*')
-      .eq('student_id', studentId);
+    // Check if studentId exists and is valid
+    if (!studentId) {
+      console.error('No student ID provided');
+      return;
+    }
 
-    if (tasksError) {
-      console.error('Error fetching tasks:', tasksError);
-    } else {
-      setTasks(ensureTasksHaveCreatedAt(tasksData));
+    try {
+      // Use a custom query to get tasks related to this student
+      // This is a workaround if student_tasks isn't in the database schema
+      const { data: tasksData, error: tasksError } = await supabase
+        .rpc('get_student_tasks', { student_id_param: parseInt(studentId) });
+
+      if (tasksError) {
+        console.error('Error fetching tasks:', tasksError);
+        setTasks([]);
+      } else if (tasksData) {
+        setTasks(ensureTasksHaveCreatedAt(tasksData));
+      } else {
+        setTasks([]);
+      }
+    } catch (error) {
+      console.error('Exception in fetchTasks:', error);
+      setTasks([]);
     }
   };
 
@@ -71,52 +93,57 @@ const StudentDetails = () => {
 
     setIsAddingTask(true);
 
-    const { data, error } = await supabase
-      .from('student_tasks')
-      .insert([
-        {
-          student_id: parseInt(studentId!),
-          description: newTaskDescription,
-          due_date: newTaskDueDate.toISOString(),
-          completed: false,
-        },
-      ]);
+    try {
+      // Use a custom RPC function to add a task for this student
+      const { data, error } = await supabase
+        .rpc('add_student_task', {
+          student_id_param: parseInt(studentId!),
+          description_param: newTaskDescription,
+          due_date_param: newTaskDueDate.toISOString(),
+          completed_param: false
+        });
 
-    if (error) {
-      console.error('Error adding task:', error);
-      alert('Failed to add task.');
-    } else {
-      setTasks([...tasks, {
-        id: data![0].id,
-        student_id: parseInt(studentId!),
-        description: newTaskDescription,
-        due_date: newTaskDueDate.toISOString(),
-        completed: false,
-        created_at: new Date().toISOString(),
-      }]);
-      setNewTaskDescription('');
-      setNewTaskDueDate(undefined);
-      alert('Task added successfully!');
+      if (error) {
+        console.error('Error adding task:', error);
+        alert('Failed to add task.');
+      } else {
+        // Refresh tasks after adding
+        await fetchTasks();
+        setNewTaskDescription('');
+        setNewTaskDueDate(undefined);
+        alert('Task added successfully!');
+      }
+    } catch (error) {
+      console.error('Exception in handleAddTask:', error);
+      alert('An unexpected error occurred.');
+    } finally {
+      setIsAddingTask(false);
     }
-
-    setIsAddingTask(false);
   };
 
   const handleTaskCompletion = async (taskId: number, completed: boolean) => {
-    const { error } = await supabase
-      .from('student_tasks')
-      .update({ completed: !completed })
-      .eq('id', taskId);
+    try {
+      // Use a custom RPC function to update task completion status
+      const { error } = await supabase
+        .rpc('update_task_completion', {
+          task_id_param: taskId,
+          completed_param: !completed
+        });
 
-    if (error) {
-      console.error('Error updating task:', error);
-      alert('Failed to update task.');
-    } else {
-      setTasks(
-        tasks.map((task) =>
-          task.id === taskId ? { ...task, completed: !completed } : task
-        )
-      );
+      if (error) {
+        console.error('Error updating task:', error);
+        alert('Failed to update task.');
+      } else {
+        // Update the local state
+        setTasks(
+          tasks.map((task) =>
+            task.id === taskId ? { ...task, completed: !completed } : task
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Exception in handleTaskCompletion:', error);
+      alert('An unexpected error occurred.');
     }
   };
 
@@ -129,11 +156,11 @@ const StudentDetails = () => {
   }
 
   return (
-    <Layout title={`Student Details - ${student.name}`}>
+    <Layout title={`Student Details - ${student.first_name} ${student.last_name}`}>
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Student: {student.name}</h2>
-        <p>Email: {student.email}</p>
-        <p>Date of Birth: {student.date_of_birth}</p>
+        <h2 className="text-2xl font-semibold mb-4">Student: {student.first_name} {student.last_name}</h2>
+        <p>Email: {student.student_email}</p>
+        <p>Date of Birth: {student.dob}</p>
 
         <div className="mt-6">
           <h3 className="text-xl font-semibold mb-2">Tasks:</h3>
